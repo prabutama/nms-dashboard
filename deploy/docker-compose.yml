@@ -8,6 +8,7 @@ services:
       PORT: "8080"
       THINGSBOARD_BASE_URL: ""
       THINGSBOARD_API_KEY: ""
+      THINGSBOARD_SITE_ASSET_TYPE: "site"
       CACHE_TTL_SECONDS: "30"
     ports:
       - "8080:8080"

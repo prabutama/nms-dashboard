@@ -1,8 +1,8 @@
 # Architecture
 
-## Phase 1 scope
+## Phase 2 scope
 
-Phase 1 builds project skeleton only.
+Phase 2 adds first read-only ThingsBoard REST integration.
 
 Current MVP rules:
 
@@ -11,7 +11,7 @@ Current MVP rules:
 * No Redis.
 * No authentication.
 * No custom RBAC.
-* No ThingsBoard REST integration yet.
+* No persistent BFF database.
 * Frontend never calls ThingsBoard directly.
 
 ## Structure
@@ -32,18 +32,25 @@ nms-dashboard/
 
 Go HTTP API service using `chi`.
 
-Responsibilities in Phase 1:
+Responsibilities in Phase 2:
 
 * boot HTTP server
 * load environment config
 * expose `/health`
 * expose `/api/v1/health`
+* expose ThingsBoard integration status
+* expose normalized site list endpoint
+* expose normalized site device list endpoint
 * provide structured logs
+
+Added in Phase 2:
+
+* ThingsBoard client
+* ThingsBoard-specific DTO isolation inside client package
+* simple normalization for sites and site devices
 
 Deferred to later phases:
 
-* ThingsBoard client
-* normalization logic
 * cache beyond in-memory placeholder config
 * auth and authorization
 
@@ -51,12 +58,13 @@ Deferred to later phases:
 
 Next.js frontend using TypeScript, Tailwind CSS, minimal shadcn-style UI primitives, and TanStack Query.
 
-Responsibilities in Phase 1:
+Responsibilities in Phase 2:
 
 * render dashboard landing page
 * define dashboard shell
 * read `NEXT_PUBLIC_API_BASE_URL`
-* optionally call BFF health endpoint
+* call BFF health endpoint
+* call BFF site list endpoint
 
 ### `deploy`
 
@@ -73,4 +81,4 @@ Services:
 Browser -> Next.js frontend -> BFF -> ThingsBoard
 ```
 
-In Phase 1, flow stops at BFF health endpoint. No ThingsBoard traffic yet.
+In Phase 2, BFF performs read-only ThingsBoard REST requests for site and device inventory.

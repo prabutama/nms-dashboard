@@ -1,26 +1,27 @@
 import { Activity, Network, Server, ShieldCheck } from "lucide-react";
 
 import { HealthStatusCard } from "@/components/health-status-card";
+import { SiteListCard } from "@/components/site-list-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getApiBaseUrl } from "@/lib/config";
 
 const overviewItems = [
   {
     title: "Sites",
-    value: "0",
-    description: "Phase 1 placeholder for site inventory.",
+    value: "Live",
+    description: "Loaded from BFF /api/v1/sites.",
     icon: Network,
   },
   {
     title: "Devices",
     value: "0",
-    description: "Device list arrives in later phases.",
+    description: "Per-site device list available through BFF endpoint.",
     icon: Server,
   },
   {
     title: "Telemetry",
     value: "Pending",
-    description: "ThingsBoard integration not enabled in Phase 1.",
+    description: "Historical telemetry stays out of Phase 2 scope.",
     icon: Activity,
   },
   {
@@ -41,9 +42,9 @@ export default function Home() {
           <div className="grid gap-6 p-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:p-8">
             <aside className="rounded-2xl border border-white/10 bg-slate-950/60 p-5">
               <p className="text-xs uppercase tracking-[0.3em] text-cyan-300">NMS Dashboard</p>
-              <h1 className="mt-3 text-2xl font-semibold">Phase 1 control surface</h1>
+              <h1 className="mt-3 text-2xl font-semibold">Phase 2 control surface</h1>
               <p className="mt-3 text-sm text-slate-300">
-                Frontend shell ready. BFF health wired. ThingsBoard integration stays disabled until later phase.
+                BFF now proxies initial ThingsBoard reads for sites and site devices. Browser still talks only to BFF.
               </p>
 
               <div className="mt-8 space-y-3 text-sm text-slate-300">
@@ -53,7 +54,7 @@ export default function Home() {
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/5 p-3">
                   <p className="text-slate-400">Backend Contract</p>
-                  <p className="mt-1 font-medium text-slate-100">`/health` and `/api/v1/health`</p>
+                  <p className="mt-1 font-medium text-slate-100">`/api/v1/sites` and ThingsBoard status routes</p>
                 </div>
               </div>
             </aside>
@@ -86,12 +87,14 @@ export default function Home() {
                     <CardTitle>Build direction</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4 text-sm text-slate-300">
-                    <p>Phase 1 keeps platform thin: stateless BFF, no database, no auth, no direct ThingsBoard calls from browser.</p>
-                    <p>Next phases add normalized site, device, telemetry, and alarm APIs behind BFF boundary.</p>
-                    <p>UI layout already reserved for overview, inventory, and detail workflows.</p>
+                    <p>Phase 2 adds first read-only ThingsBoard integration in stateless BFF.</p>
+                    <p>Normalized endpoints now cover site inventory and per-site devices.</p>
+                    <p>Telemetry, charts, alarms, and summaries stay deferred.</p>
                   </CardContent>
                 </Card>
               </div>
+
+              <SiteListCard />
             </div>
           </div>
         </section>

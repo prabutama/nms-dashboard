@@ -11,5 +11,17 @@ export type HealthResponse = {
     thingsBoardApiKeySet: boolean;
     thingsBoardConfigured: boolean;
     thingsBoardClientEnabled: boolean;
+    thingsBoardSiteAssetType: string;
   };
+};
+
+export type Site = {
+  siteKey: string;
+  assetId: string;
+  name: string;
+  type: string;
+};
+
+export type SitesResponse = {
+  items: Site[];
 };

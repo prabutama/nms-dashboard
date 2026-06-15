@@ -3,12 +3,15 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
 	Port                string
 	ThingsBoardBaseURL  string
 	ThingsBoardAPIKey   string
+	ThingsBoardSiteType string
+	CORSAllowedOrigins  []string
 	CacheTTLSeconds     int
 	HasThingsBoardSetup bool
 }
@@ -28,6 +31,8 @@ func Load() Config {
 		Port:                getEnv("PORT", "8080"),
 		ThingsBoardBaseURL:  thingsBoardBaseURL,
 		ThingsBoardAPIKey:   thingsBoardAPIKey,
+		ThingsBoardSiteType: getEnv("THINGSBOARD_SITE_ASSET_TYPE", "site"),
+		CORSAllowedOrigins:  splitCSVEnv(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 		CacheTTLSeconds:     cacheTTLSeconds,
 		HasThingsBoardSetup: thingsBoardBaseURL != "" && thingsBoardAPIKey != "",
 	}
@@ -39,4 +44,20 @@ func getEnv(key, fallback string) string {
 	}
 
 	return fallback
+}
+
+func splitCSVEnv(value string) []string {
+	parts := make([]string, 0)
+	for _, part := range strings.Split(value, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+
+	if len(parts) == 0 {
+		return []string{"http://localhost:3000"}
+	}
+
+	return parts
 }

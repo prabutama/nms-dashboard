@@ -27,17 +27,41 @@ Not included in Phase 1:
 * custom RBAC
 * charts and topology data
 
+## Phase 2: First ThingsBoard integration
+
+Status: complete after validation.
+
+Delivered:
+
+* ThingsBoard REST client in BFF
+* integration status endpoint
+* normalized site list endpoint
+* normalized site device list endpoint
+* frontend site list placeholder
+* environment examples and updated docs
+
+Implemented in Phase 2:
+
+* `GET /api/v1/integrations/thingsboard/status`
+* `GET /api/v1/sites`
+* `GET /api/v1/sites/{siteKey}/devices`
+* BFF config support for `THINGSBOARD_SITE_ASSET_TYPE`
+* initial asset and relation normalization
+
+Not included in Phase 2:
+
+* telemetry history
+* alarm normalization
+* charts
+* authentication
+* persistent storage
+
 ## Planned later phases
-
-### Phase 2
-
-* ThingsBoard REST client setup
-* normalized BFF service boundaries
 
 ### Phase 3
 
-* site and device list APIs
-* dashboard summary endpoints
+* device summary endpoints
+* richer dashboard detail screens
 
 ### Phase 4
 

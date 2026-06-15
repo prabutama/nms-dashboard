@@ -2,16 +2,15 @@
 
 Custom NMS dashboard platform using ThingsBoard as backend source for telemetry, devices, relations, attributes, catalog data, and alarms.
 
-Phase 1 builds skeleton only.
+Phase 2 adds first read-only ThingsBoard integration through BFF.
 
 ## MVP decisions
 
 * stateless BFF
 * no persistent database
-* no Redis in Phase 1
-* no authentication in Phase 1
-* no custom RBAC in Phase 1
-* no ThingsBoard integration in Phase 1
+* no Redis in MVP
+* no authentication yet
+* no custom RBAC yet
 * frontend never calls ThingsBoard directly
 
 ## Project structure
@@ -35,10 +34,13 @@ Stack:
 * environment-based config
 * `log/slog` structured logging
 
-Phase 1 endpoints:
+Phase 2 endpoints:
 
 * `GET /health`
 * `GET /api/v1/health`
+* `GET /api/v1/integrations/thingsboard/status`
+* `GET /api/v1/sites`
+* `GET /api/v1/sites/{siteKey}/devices`
 
 ### Frontend
 
@@ -50,7 +52,7 @@ Stack:
 * shadcn-style UI primitives
 * TanStack Query
 
-Phase 1 frontend includes dashboard landing page and BFF health status panel.
+Phase 2 frontend includes dashboard landing page, BFF health status panel, and site list loaded from BFF.
 
 ## Environment variables
 
@@ -60,7 +62,9 @@ Phase 1 frontend includes dashboard landing page and BFF health status panel.
 PORT=8080
 THINGSBOARD_BASE_URL=
 THINGSBOARD_API_KEY=
+THINGSBOARD_SITE_ASSET_TYPE=site
 CACHE_TTL_SECONDS=30
+CORS_ALLOWED_ORIGINS=http://localhost:3000
 ```
 
 ### `apps/web`
@@ -75,7 +79,13 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 
 ```bash
 cd apps/bff
-go run ./cmd/api
+go run .
+```
+
+Copy env example first:
+
+```bash
+cp .env.example .env
 ```
 
 ### Run frontend
@@ -84,6 +94,12 @@ go run ./cmd/api
 cd apps/web
 npm install
 npm run dev
+```
+
+Copy env example first:
+
+```bash
+cp .env.example .env.local
 ```
 
 ## Validation
@@ -120,3 +136,9 @@ docker compose -f deploy/docker-compose.yml up --build
 Frontend: `http://localhost:3000`
 
 BFF: `http://localhost:8080`
+
+## Phase 2 behavior
+
+* BFF sends `THINGSBOARD_API_KEY` to ThingsBoard only.
+* frontend reads sites only from BFF.
+* site list derives `siteKey` from asset attribute `siteKey` when present, else slug from asset name.

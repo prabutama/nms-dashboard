@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -28,36 +27,9 @@ func NewRouter(cfg config.Config, logger *slog.Logger) http.Handler {
 	router.Use(chimiddleware.Recoverer)
 	router.Use(requestLogger(logger))
 
-	router.Get("/health", healthHandler(cfg))
-	router.Route("/api/v1", func(r chi.Router) {
-		r.Get("/health", healthHandler(cfg))
-	})
+	newAPIServer(cfg, logger).registerRoutes(router)
 
 	return router
-}
-
-func healthHandler(cfg config.Config) http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
-		response := healthResponse{
-			Service:   "nms-bff",
-			Status:    "ok",
-			Timestamp: time.Now().UTC().Format(time.RFC3339),
-			Version:   "phase-1",
-			Phase:     "skeleton",
-			Config: map[string]interface{}{
-				"port":                     cfg.Port,
-				"cacheTtlSeconds":          cfg.CacheTTLSeconds,
-				"thingsBoardBaseUrlSet":    cfg.ThingsBoardBaseURL != "",
-				"thingsBoardApiKeySet":     cfg.ThingsBoardAPIKey != "",
-				"thingsBoardConfigured":    cfg.HasThingsBoardSetup,
-				"thingsBoardClientEnabled": false,
-			},
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(response)
-	}
 }
 
 func requestLogger(logger *slog.Logger) func(http.Handler) http.Handler {
