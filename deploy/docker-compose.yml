@@ -1,0 +1,25 @@
+services:
+  nms-bff:
+    build:
+      context: ../apps/bff
+      dockerfile: Dockerfile
+    container_name: nms-bff
+    environment:
+      PORT: "8080"
+      THINGSBOARD_BASE_URL: ""
+      THINGSBOARD_API_KEY: ""
+      CACHE_TTL_SECONDS: "30"
+    ports:
+      - "8080:8080"
+
+  nms-web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+    container_name: nms-web
+    depends_on:
+      - nms-bff
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: "http://localhost:8080"
+    ports:
+      - "3000:3000"
