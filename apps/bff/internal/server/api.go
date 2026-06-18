@@ -96,6 +96,33 @@ type alarmsResponse struct {
 	Message string `json:"message,omitempty"`
 }
 
+type authLoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type authRefreshRequest struct {
+	RefreshToken string `json:"refreshToken"`
+}
+
+type authUserResponse struct {
+	User         authUserInfo `json:"user"`
+	Token        string       `json:"token,omitempty"`
+	RefreshToken string       `json:"refreshToken,omitempty"`
+	Source       string       `json:"source,omitempty"`
+	Message      string       `json:"message,omitempty"`
+}
+
+type authUserInfo struct {
+	ID         string `json:"id"`
+	Email      string `json:"email"`
+	Authority  string `json:"authority"`
+	FirstName  string `json:"firstName,omitempty"`
+	LastName   string `json:"lastName,omitempty"`
+	CustomerID string `json:"customerId,omitempty"`
+	TenantID   string `json:"tenantId,omitempty"`
+}
+
 type alarmActionResponse struct {
 	OK      bool      `json:"ok"`
 	Action  string    `json:"action"`
@@ -173,24 +200,32 @@ func (s *apiServer) registerRoutes(r chi.Router) {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.healthHandler())
 		r.Get("/integrations/thingsboard/status", s.thingsBoardStatusHandler())
-		r.Get("/alarms", s.alarmsHandler())
-		r.Post("/alarms/{alarmId}/ack", s.alarmAckHandler())
-		r.Post("/alarms/{alarmId}/clear", s.alarmClearHandler())
-		r.Get("/sites", s.sitesHandler())
-		r.Get("/sites/{siteKey}/devices", s.siteDevicesHandler())
-		r.Get("/sites/{siteKey}/alarms", s.siteAlarmsHandler())
-		r.Get("/sites/{siteKey}/topology", s.siteTopologyHandler())
-		r.Get("/devices/{deviceId}", s.deviceDetailHandler())
-		r.Get("/devices/{deviceId}/telemetry/latest", s.latestTelemetryHandler())
-		r.Get("/devices/{deviceId}/telemetry/history", s.telemetryHistoryHandler())
-		r.Get("/devices/{deviceId}/summary", s.deviceSummaryHandler())
-		r.Get("/devices/{deviceId}/dashboard", s.deviceDashboardHandler())
-		r.Get("/devices/{deviceId}/alarms", s.deviceAlarmsHandler())
-		r.Get("/devices/{deviceId}/attributes", s.deviceAttributesHandler())
-		r.Get("/assets/{assetId}/attributes", s.assetAttributesHandler())
-		r.Get("/reports/summary", s.reportsSummaryHandler())
-		r.Get("/reports/sites", s.reportsSitesHandler())
-		r.Get("/reports/devices", s.reportsDevicesHandler())
+		r.Post("/auth/login", s.authLoginHandler())
+		r.Post("/auth/refresh", s.authRefreshHandler())
+
+		r.Group(func(r chi.Router) {
+			r.Use(s.requireTBAuth())
+			r.Get("/auth/me", s.authMeHandler())
+			r.Post("/auth/logout", s.authLogoutHandler())
+			r.Get("/alarms", s.alarmsHandler())
+			r.Get("/sites", s.sitesHandler())
+			r.Get("/sites/{siteKey}/devices", s.siteDevicesHandler())
+			r.Get("/sites/{siteKey}/alarms", s.siteAlarmsHandler())
+			r.Get("/sites/{siteKey}/topology", s.siteTopologyHandler())
+			r.Get("/devices/{deviceId}", s.deviceDetailHandler())
+			r.Get("/devices/{deviceId}/telemetry/latest", s.latestTelemetryHandler())
+			r.Get("/devices/{deviceId}/telemetry/history", s.telemetryHistoryHandler())
+			r.Get("/devices/{deviceId}/summary", s.deviceSummaryHandler())
+			r.Get("/devices/{deviceId}/dashboard", s.deviceDashboardHandler())
+			r.Get("/devices/{deviceId}/alarms", s.deviceAlarmsHandler())
+			r.Get("/assets/{assetId}/attributes", s.assetAttributesHandler())
+			r.Get("/reports/summary", s.reportsSummaryHandler())
+			r.Get("/reports/sites", s.reportsSitesHandler())
+			r.Get("/reports/devices", s.reportsDevicesHandler())
+			r.With(s.requireAuthority("TENANT_ADMIN", "SYS_ADMIN")).Get("/devices/{deviceId}/attributes", s.deviceAttributesHandler())
+			r.With(s.requireAuthority("TENANT_ADMIN", "SYS_ADMIN")).Post("/alarms/{alarmId}/ack", s.alarmAckHandler())
+			r.With(s.requireAuthority("TENANT_ADMIN", "SYS_ADMIN")).Post("/alarms/{alarmId}/clear", s.alarmClearHandler())
+		})
 	})
 }
 
@@ -230,7 +265,7 @@ func (s *apiServer) thingsBoardStatusHandler() http.HandlerFunc {
 		}
 
 		if s.tb != nil {
-			if err := s.tb.CheckStatus(r.Context(), s.cfg.ThingsBoardSiteType); err == nil {
+			if err := s.tbCheckStatus(r.Context(), s.cfg.ThingsBoardSiteType); err == nil {
 				response.Status = "ok"
 				response.ThingsBoard.Reachable = true
 			} else {
@@ -256,7 +291,7 @@ func (s *apiServer) alarmsHandler() http.HandlerFunc {
 		page := parseIntQuery(r, "page", 0)
 		pageSize := parseIntQuery(r, "pageSize", 20)
 
-		alarmPage, err := s.tb.ListAlarms(r.Context(), thingsboard.AlarmQuery{
+		alarmPage, err := s.tbListAlarms(r.Context(), thingsboard.AlarmQuery{
 			SearchStatus: r.URL.Query().Get("searchStatus"),
 			Status:       r.URL.Query().Get("status"),
 			TextSearch:   r.URL.Query().Get("textSearch"),
@@ -362,9 +397,9 @@ func (s *apiServer) handleAlarmAction(w http.ResponseWriter, r *http.Request, ac
 	)
 	switch action {
 	case "ack":
-		alarm, err = s.tb.AcknowledgeAlarm(r.Context(), alarmID)
+		alarm, err = s.tbAckAlarm(r.Context(), alarmID)
 	case "clear":
-		alarm, err = s.tb.ClearAlarm(r.Context(), alarmID)
+		alarm, err = s.tbClearAlarm(r.Context(), alarmID)
 	default:
 		writeError(w, http.StatusBadRequest, "unsupported alarm action")
 		return
@@ -547,7 +582,7 @@ func (s *apiServer) siteAlarmsHandler() http.HandlerFunc {
 		items := make([]nms.Alarm, 0)
 
 		for _, device := range devices {
-			alarmPage, err := s.tb.ListEntityAlarms(r.Context(), "DEVICE", device.DeviceID, thingsboard.AlarmQuery{
+			alarmPage, err := s.tbListEntityAlarms(r.Context(), "DEVICE", device.DeviceID, thingsboard.AlarmQuery{
 				Page:         0,
 				PageSize:     50,
 				SearchStatus: r.URL.Query().Get("searchStatus"),
@@ -603,7 +638,7 @@ func (s *apiServer) deviceAlarmsHandler() http.HandlerFunc {
 			return
 		}
 
-		alarmPage, err := s.tb.ListEntityAlarms(r.Context(), "DEVICE", deviceID, thingsboard.AlarmQuery{
+		alarmPage, err := s.tbListEntityAlarms(r.Context(), "DEVICE", deviceID, thingsboard.AlarmQuery{
 			Page:         parseIntQuery(r, "page", 0),
 			PageSize:     parseIntQuery(r, "pageSize", 20),
 			SearchStatus: r.URL.Query().Get("searchStatus"),
@@ -697,7 +732,7 @@ func (s *apiServer) siteTopologyHandler() http.HandlerFunc {
 			return
 		}
 
-		attrs, err := s.tb.GetEntityAttributes(r.Context(), "ASSET", selected.AssetID, "SERVER_SCOPE", nil)
+		attrs, err := s.tbGetEntityAttributes(r.Context(), "ASSET", selected.AssetID, "SERVER_SCOPE", nil)
 		if err != nil {
 			s.logger.Warn("load asset attributes for topology failed", "assetId", selected.AssetID, "error", err)
 			writeJSON(w, http.StatusOK, nms.SiteTopologyResponse{
@@ -1026,7 +1061,7 @@ func (s *apiServer) deviceDetailHandler() http.HandlerFunc {
 			return
 		}
 
-		device, err := s.tb.GetDevice(r.Context(), deviceID)
+		device, err := s.tbGetDevice(r.Context(), deviceID)
 		if err != nil {
 			s.logger.Warn("load device detail failed", "deviceId", deviceID, "error", err)
 			writeJSON(w, http.StatusOK, deviceDetailResponse{
@@ -1065,7 +1100,7 @@ func (s *apiServer) latestTelemetryHandler() http.HandlerFunc {
 			return
 		}
 
-		telemetry, err := s.tb.GetLatestTelemetry(r.Context(), deviceID)
+		telemetry, err := s.tbGetLatestTelemetry(r.Context(), deviceID)
 		if err != nil {
 			s.logger.Warn("load latest telemetry failed", "deviceId", deviceID, "error", err)
 			writeJSON(w, http.StatusOK, latestTelemetryResponse{
@@ -1115,7 +1150,7 @@ func (s *apiServer) telemetryHistoryHandler() http.HandlerFunc {
 		keys := splitQueryCSV(r.URL.Query().Get("keys"))
 
 		if len(keys) == 0 {
-			latest, err := s.tb.GetLatestTelemetry(r.Context(), deviceID)
+			latest, err := s.tbGetLatestTelemetry(r.Context(), deviceID)
 			if err != nil {
 				s.logger.Warn("infer telemetry history keys failed", "deviceId", deviceID, "error", err)
 				writeJSON(w, http.StatusOK, telemetryHistoryResponse{
@@ -1144,7 +1179,7 @@ func (s *apiServer) telemetryHistoryHandler() http.HandlerFunc {
 			return
 		}
 
-		series, err := s.tb.GetTelemetryHistory(r.Context(), deviceID, keys, startTs, endTs, interval, limit)
+		series, err := s.tbGetTelemetryHistory(r.Context(), deviceID, keys, startTs, endTs, interval, limit)
 		if err != nil {
 			s.logger.Warn("load telemetry history failed", "deviceId", deviceID, "error", err)
 			writeJSON(w, http.StatusOK, telemetryHistoryResponse{
@@ -1178,7 +1213,7 @@ func (s *apiServer) deviceSummaryHandler() http.HandlerFunc {
 			return
 		}
 
-		device, err := s.tb.GetDevice(r.Context(), deviceID)
+		device, err := s.tbGetDevice(r.Context(), deviceID)
 		if err != nil {
 			s.logger.Warn("load device summary detail failed", "deviceId", deviceID, "error", err)
 			writeJSON(w, http.StatusOK, deviceSummaryResponse{
@@ -1189,7 +1224,7 @@ func (s *apiServer) deviceSummaryHandler() http.HandlerFunc {
 			return
 		}
 
-		telemetry, err := s.tb.GetLatestTelemetry(r.Context(), deviceID)
+		telemetry, err := s.tbGetLatestTelemetry(r.Context(), deviceID)
 		if err != nil {
 			s.logger.Warn("load device summary telemetry failed", "deviceId", deviceID, "error", err)
 			writeJSON(w, http.StatusOK, deviceSummaryResponse{
@@ -1244,7 +1279,7 @@ func (s *apiServer) deviceDashboardHandler() http.HandlerFunc {
 			return
 		}
 
-		device, err := s.tb.GetDevice(r.Context(), deviceID)
+		device, err := s.tbGetDevice(r.Context(), deviceID)
 		if err != nil {
 			s.logger.Warn("load dashboard device detail failed", "deviceId", deviceID, "error", err)
 			writeJSON(w, http.StatusOK, deviceDashboardResponse{
@@ -1255,7 +1290,7 @@ func (s *apiServer) deviceDashboardHandler() http.HandlerFunc {
 			return
 		}
 
-		telemetry, err := s.tb.GetLatestTelemetry(r.Context(), deviceID)
+		telemetry, err := s.tbGetLatestTelemetry(r.Context(), deviceID)
 		if err != nil {
 			s.logger.Warn("load dashboard telemetry failed", "deviceId", deviceID, "error", err)
 			writeJSON(w, http.StatusOK, deviceDashboardResponse{
@@ -1268,7 +1303,7 @@ func (s *apiServer) deviceDashboardHandler() http.HandlerFunc {
 
 		attributes := make([]nms.AttributeValue, 0)
 		for _, scope := range []string{"SERVER_SCOPE", "CLIENT_SCOPE", "SHARED_SCOPE"} {
-			scopeAttributes, err := s.tb.GetEntityAttributes(r.Context(), "DEVICE", deviceID, scope, nil)
+			scopeAttributes, err := s.tbGetEntityAttributes(r.Context(), "DEVICE", deviceID, scope, nil)
 			if err != nil {
 				s.logger.Warn("load dashboard attributes failed", "deviceId", deviceID, "scope", scope, "error", err)
 				continue
@@ -1322,7 +1357,7 @@ func (s *apiServer) writeAttributes(w http.ResponseWriter, r *http.Request, enti
 	keys := splitQueryCSV(r.URL.Query().Get("keys"))
 	attributesByScope := make(map[string][]nms.AttributeValue, len(scopes))
 	for _, scope := range scopes {
-		attributes, err := s.tb.GetEntityAttributes(r.Context(), entityType, entityID, scope, keys)
+		attributes, err := s.tbGetEntityAttributes(r.Context(), entityType, entityID, scope, keys)
 		if err != nil {
 			s.logger.Warn("load entity attributes failed", "entityType", entityType, "entityId", entityID, "scope", scope, "error", err)
 			writeJSON(w, http.StatusOK, attributesResponse{
@@ -1395,7 +1430,7 @@ func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 			SortProperty: "createdTime",
 			SortOrder:    "DESC",
 		}
-		alarmPage, alarmErr := s.tb.ListAlarms(ctx, alarmQuery)
+		alarmPage, alarmErr := s.tbListAlarms(ctx, alarmQuery)
 
 		activeAlarmCount := 0
 		criticalAlarmCount := 0
@@ -1446,7 +1481,7 @@ func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 					}
 				}
 
-				telemetry, err := s.tb.GetLatestTelemetry(ctx, device.DeviceID)
+				telemetry, err := s.tbGetLatestTelemetry(ctx, device.DeviceID)
 				if err != nil {
 					continue
 				}
@@ -1467,7 +1502,7 @@ func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 				reachable := hasTelemetry
 				if v, ok := telemetryMap["icmp.reachable"]; ok {
 					val2, _ := parseTelemetryValue(v)
-				reachable = truthy(val2)
+					reachable = truthy(val2)
 				}
 				freshness := "unknown"
 				if lastTs > 0 {
@@ -1657,7 +1692,7 @@ func (s *apiServer) reportsSitesHandler() http.HandlerFunc {
 			SortProperty: "createdTime",
 			SortOrder:    "DESC",
 		}
-		alarmPage, alarmErr := s.tb.ListAlarms(ctx, alarmQuery)
+		alarmPage, alarmErr := s.tbListAlarms(ctx, alarmQuery)
 
 		alarmsByDevice := make(map[string][]thingsboard.AlarmInfo)
 		if alarmErr == nil {
@@ -1692,7 +1727,7 @@ func (s *apiServer) reportsSitesHandler() http.HandlerFunc {
 					}
 				}
 
-				telemetry, err := s.tb.GetLatestTelemetry(ctx, device.DeviceID)
+				telemetry, err := s.tbGetLatestTelemetry(ctx, device.DeviceID)
 				if err != nil {
 					continue
 				}
@@ -1786,7 +1821,7 @@ func (s *apiServer) reportsDevicesHandler() http.HandlerFunc {
 			SortProperty: "createdTime",
 			SortOrder:    "DESC",
 		}
-		alarmPage, alarmErr := s.tb.ListAlarms(ctx, alarmQuery)
+		alarmPage, alarmErr := s.tbListAlarms(ctx, alarmQuery)
 		alarmsByDevice := make(map[string][]thingsboard.AlarmInfo)
 		if alarmErr == nil {
 			for _, alarm := range alarmPage.Items {
@@ -1811,7 +1846,7 @@ func (s *apiServer) reportsDevicesHandler() http.HandlerFunc {
 				deviceAlarms := alarmsByDevice[device.DeviceID]
 				alarmCount := len(deviceAlarms)
 
-				telemetry, err := s.tb.GetLatestTelemetry(ctx, device.DeviceID)
+				telemetry, err := s.tbGetLatestTelemetry(ctx, device.DeviceID)
 				if err != nil {
 					continue
 				}
@@ -1829,7 +1864,7 @@ func (s *apiServer) reportsDevicesHandler() http.HandlerFunc {
 				reachable := hasTelemetry
 				if v, ok := telemetryMap["icmp.reachable"]; ok {
 					val2, _ := parseTelemetryValue(v)
-				reachable = truthy(val2)
+					reachable = truthy(val2)
 				}
 				freshness := "unknown"
 				if lastTs > 0 {
@@ -1922,14 +1957,28 @@ func parseFloat64(value string) float64 {
 }
 
 func (s *apiServer) loadSites(ctx context.Context) ([]nms.Site, error) {
-	assets, err := s.tb.ListAssetsByType(ctx, s.cfg.ThingsBoardSiteType)
+	var (
+		assets []thingsboard.Asset
+		err    error
+	)
+
+	if user, ok := authUserFromContext(ctx); ok && user.Authority == "CUSTOMER_USER" {
+		token, tokenOK := authTokenFromContext(ctx)
+		if tokenOK && user.CustomerID != "" {
+			assets, err = s.tb.ListCustomerAssetsByTypeWithBearer(ctx, token, user.CustomerID, s.cfg.ThingsBoardSiteType)
+		} else {
+			assets, err = s.tbListAssetsByType(ctx, s.cfg.ThingsBoardSiteType)
+		}
+	} else {
+		assets, err = s.tbListAssetsByType(ctx, s.cfg.ThingsBoardSiteType)
+	}
 	if err != nil {
 		return nil, err
 	}
 
 	sites := make([]nms.Site, 0, len(assets))
 	for _, asset := range assets {
-		attributes, err := s.tb.GetAssetAttributes(ctx, asset.ID, []string{"siteKey"})
+		attributes, err := s.tbGetAssetAttributes(ctx, asset.ID, []string{"siteKey"})
 		if err != nil {
 			return nil, fmt.Errorf("load attributes for asset %s: %w", asset.ID, err)
 		}
@@ -1966,7 +2015,7 @@ func slugify(value string) string {
 }
 
 func (s *apiServer) loadSiteDevices(ctx context.Context, site nms.Site) ([]nms.Device, error) {
-	relations, err := s.tb.GetAssetRelations(ctx, site.AssetID)
+	relations, err := s.tbGetAssetRelations(ctx, site.AssetID)
 	if err != nil {
 		return nil, err
 	}
@@ -1977,7 +2026,7 @@ func (s *apiServer) loadSiteDevices(ctx context.Context, site nms.Site) ([]nms.D
 			continue
 		}
 
-		device, err := s.tb.GetDevice(ctx, relation.ToID)
+		device, err := s.tbGetDevice(ctx, relation.ToID)
 		if err != nil {
 			return nil, fmt.Errorf("load device %s: %w", relation.ToID, err)
 		}
@@ -2008,7 +2057,7 @@ type deviceLookupInfo struct {
 }
 
 func (s *apiServer) loadSiteDeviceInfo(ctx context.Context, site nms.Site) (map[string]deviceLookupInfo, error) {
-	relations, err := s.tb.GetAssetRelations(ctx, site.AssetID)
+	relations, err := s.tbGetAssetRelations(ctx, site.AssetID)
 	if err != nil {
 		return nil, err
 	}
@@ -2019,7 +2068,7 @@ func (s *apiServer) loadSiteDeviceInfo(ctx context.Context, site nms.Site) (map[
 			continue
 		}
 
-		device, err := s.tb.GetDevice(ctx, relation.ToID)
+		device, err := s.tbGetDevice(ctx, relation.ToID)
 		if err != nil {
 			return nil, fmt.Errorf("load device %s: %w", relation.ToID, err)
 		}
@@ -2161,6 +2210,8 @@ func buildMetricCards(telemetry []nms.TelemetryValue, catalog map[string]metricC
 			} else {
 				status = "critical"
 			}
+		} else if isInterfaceOperationalStatusKey(item.Key) {
+			status = interfaceMetricStatus(item.Key, value)
 		} else if numeric {
 			status = metricStatus(value.(float64), entry)
 			if status == "unknown" && isObservationalNumericMetric(item.Key) {
@@ -2876,6 +2927,34 @@ func isObservationalNumericMetric(key string) bool {
 		return strings.HasSuffix(key, ".used_bytes") || strings.HasSuffix(key, ".total_bytes") || strings.HasSuffix(key, ".free_bytes")
 	}
 	return false
+}
+
+func isInterfaceOperationalStatusKey(key string) bool {
+	return strings.HasSuffix(key, ".oper_status") || strings.HasSuffix(key, ".admin_status")
+}
+
+func interfaceMetricStatus(key string, value any) string {
+	raw := strings.ToLower(strings.TrimSpace(fmt.Sprint(value)))
+	switch raw {
+	case "1", "true", "yes", "up", "enabled", "online", "running":
+		return "normal"
+	case "2", "false", "no", "down", "disabled", "offline", "notpresent", "lowerlayerdown":
+		if strings.HasSuffix(key, ".admin_status") {
+			return "warning"
+		}
+		return "critical"
+	default:
+		if parsed, ok := parseBoolString(raw); ok {
+			if parsed {
+				return "normal"
+			}
+			if strings.HasSuffix(key, ".admin_status") {
+				return "warning"
+			}
+			return "critical"
+		}
+		return "unknown"
+	}
 }
 
 func truthy(value any) bool {

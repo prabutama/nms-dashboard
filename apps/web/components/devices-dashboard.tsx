@@ -1,27 +1,23 @@
 "use client";
 
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { DashboardShell } from "@/components/dashboard-shell";
 import { DeviceLink, StatCard } from "@/components/nms-ui";
-import { fetchReportSummary, fetchSiteDevices, fetchSites } from "@/lib/api";
+import { fetchReportDevices, fetchReportSummary } from "@/lib/api";
 
 export function DevicesDashboard() {
-  const sitesQuery = useQuery({ queryKey: ["sites"], queryFn: fetchSites, refetchInterval: 60_000 });
   const summaryQuery = useQuery({
     queryKey: ["report-summary", "24h"],
     queryFn: () => fetchReportSummary("24h"),
     refetchInterval: 60_000,
   });
-  const deviceQueries = useQueries({
-    queries: (sitesQuery.data?.items || []).map((site) => ({
-      queryKey: ["site-devices", site.siteKey],
-      queryFn: () => fetchSiteDevices(site.siteKey),
-      enabled: sitesQuery.data !== undefined,
-      refetchInterval: 60_000,
-    })),
+  const devicesQuery = useQuery({
+    queryKey: ["report-devices", "24h"],
+    queryFn: () => fetchReportDevices("24h"),
+    refetchInterval: 60_000,
   });
-  const devices = deviceQueries.flatMap((query, index) => (query.data?.items || []).map((device) => ({ ...device, siteKey: sitesQuery.data?.items[index]?.siteKey })));
+  const devices = devicesQuery.data?.items || [];
 
   return (
     <DashboardShell title="Devices" subtitle="All monitored devices discovered from site relations.">
@@ -36,10 +32,10 @@ export function DevicesDashboard() {
           <p className="text-xs font-semibold text-slate-700">Device Inventory</p>
           <p className="mt-0.5 text-[11px] text-slate-500">Select a device to view operational metrics and charts.</p>
         </div>
-        {sitesQuery.isLoading || deviceQueries.some((query) => query.isLoading) ? <p className="px-4 py-5 text-xs text-slate-500">Loading devices...</p> : null}
+        {devicesQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-500">Loading devices...</p> : null}
         <div className="divide-y divide-slate-100">
           {devices.map((device) => (
-            <DeviceLink key={device.deviceId} href={`/devices/${device.deviceId}${device.siteKey ? `?site=${device.siteKey}` : ""}`} name={device.label || device.name} type={`${device.type}${device.siteKey ? ` · ${device.siteKey}` : ""}`} status="unknown" />
+            <DeviceLink key={device.deviceId} href={`/devices/${device.deviceId}${device.siteKey ? `?site=${device.siteKey}` : ""}`} name={device.name} type={`${device.type}${device.siteKey ? ` · ${device.siteKey}` : ""}`} status={device.health} />
           ))}
         </div>
       </section>

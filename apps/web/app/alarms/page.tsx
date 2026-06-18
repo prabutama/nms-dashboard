@@ -1,7 +1,9 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { useAuth } from "@/components/auth-provider";
 import { StatCard, StatusBadge } from "@/components/nms-ui";
 import { ackAlarm, clearAlarm, fetchAlarms } from "@/lib/api";
 import type { Alarm } from "@/lib/types";
@@ -35,11 +37,13 @@ function AlarmRow({
   onAck,
   onClear,
   pendingAction,
+  canManage,
 }: {
   alarm: Alarm;
   onAck: (alarmId: string) => void;
   onClear: (alarmId: string) => void;
   pendingAction?: "ack" | "clear" | null;
+  canManage: boolean;
 }) {
   return (
     <tr className="divide-x divide-slate-100">
@@ -51,7 +55,7 @@ function AlarmRow({
       <td className="px-4 py-2">{alarm.acknowledged ? <StatusBadge status="normal" /> : <StatusBadge status="warning" />}</td>
       <td className="px-4 py-2">
         <div className="flex items-center gap-2">
-          {!alarm.acknowledged ? (
+          {canManage && !alarm.acknowledged ? (
             <button
               type="button"
               onClick={() => onAck(alarm.alarmId)}
@@ -61,7 +65,7 @@ function AlarmRow({
               {pendingAction === "ack" ? "Acking..." : "Acknowledge"}
             </button>
           ) : null}
-          {!alarm.cleared ? (
+          {canManage && !alarm.cleared ? (
             <button
               type="button"
               onClick={() => onClear(alarm.alarmId)}
@@ -78,6 +82,8 @@ function AlarmRow({
 }
 
 export default function AlarmsPage() {
+  const router = useRouter();
+  const { user, isAuthenticated, ready } = useAuth();
   const queryClient = useQueryClient();
   const alarmsQuery = useQuery({
     queryKey: ["alarms"],
@@ -117,13 +123,19 @@ export default function AlarmsPage() {
   const activeAlarms = alarmsQuery.data?.items || [];
   const totalActive = activeAlarms.length;
   const criticalCount = activeAlarms.filter((a) => a.severity === "CRITICAL" || a.severity === "MAJOR").length;
+  const canManage = user?.authority === "TENANT_ADMIN" || user?.authority === "SYS_ADMIN";
+
+  if (ready && !isAuthenticated) {
+    router.replace("/login");
+    return null;
+  }
 
   return (
     <DashboardShell title="Alarms" subtitle="Active and historical alarms across all monitored devices.">
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard title="Active Alarms" value={alarmsQuery.isLoading ? "-" : totalActive} />
         <StatCard title="Critical / Major" value={alarmsQuery.isLoading ? "-" : criticalCount} status={criticalCount > 0 ? "critical" : "normal"} />
-        <StatCard title="Total (all time)" value={alarmsQuery.data?.totalElements ?? "-"} />
+        <StatCard title="Access" value={canManage ? "Operator" : "Read Only"} status={canManage ? "normal" : "unknown"} />
       </div>
 
       {ackMutation.error ? <p className="border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{ackMutation.error.message}</p> : null}
@@ -159,6 +171,7 @@ export default function AlarmsPage() {
                     onAck={handleAck}
                     onClear={handleClear}
                     pendingAction={ackMutation.variables === alarm.alarmId && ackMutation.isPending ? "ack" : clearMutation.variables === alarm.alarmId && clearMutation.isPending ? "clear" : null}
+                    canManage={canManage}
                   />
                 ))}
               </tbody>

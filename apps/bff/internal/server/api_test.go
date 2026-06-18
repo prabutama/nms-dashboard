@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strconv"
 	"strings"
 	"testing"
@@ -12,6 +13,54 @@ import (
 
 	"github.com/isapr/nms-dashboard/apps/bff/internal/config"
 )
+
+func authedRequest(method, target string) *http.Request {
+	req := httptest.NewRequest(method, target, nil)
+	req.Header.Set("Authorization", "Bearer user-token")
+	return req
+}
+
+func adminAuthedRequest(method, target string) *http.Request {
+	req := httptest.NewRequest(method, target, nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
+	return req
+}
+
+func authedRequestWithBody(method, target string, body io.Reader) *http.Request {
+	req := httptest.NewRequest(method, target, body)
+	req.Header.Set("Authorization", "Bearer user-token")
+	return req
+}
+
+func requireBearerUser(t *testing.T, w http.ResponseWriter, r *http.Request) bool {
+	t.Helper()
+	if r.URL.Path != "/api/auth/user" {
+		return false
+	}
+	if got := r.Header.Get("X-Authorization"); got != "Bearer user-token" {
+		t.Fatalf("unexpected auth header %s", got)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"id":{"entityType":"USER","id":"user-1"},"tenantId":{"entityType":"TENANT","id":"tenant-1"},"customerId":{"entityType":"CUSTOMER","id":"customer-1"},"email":"user@example.com","authority":"CUSTOMER_USER","firstName":"Customer","lastName":"User"}`))
+	return true
+}
+
+func requireAdminBearerUser(t *testing.T, w http.ResponseWriter, r *http.Request) bool {
+	t.Helper()
+	if r.URL.Path != "/api/auth/user" {
+		return false
+	}
+	if got := r.Header.Get("X-Authorization"); got != "Bearer admin-token" {
+		t.Fatalf("unexpected auth header %s", got)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"id":{"entityType":"USER","id":"user-1"},"tenantId":{"entityType":"TENANT","id":"tenant-1"},"customerId":{"entityType":"CUSTOMER","id":"customer-1"},"email":"admin@example.com","authority":"TENANT_ADMIN","firstName":"Admin","lastName":"User"}`))
+	return true
+}
+
+func queryHasScope(query url.Values) bool {
+	return query.Get("scope") != ""
+}
 
 func TestThingsBoardStatusConfiguredAndReachable(t *testing.T) {
 	t.Parallel()
@@ -68,16 +117,15 @@ func TestDeviceDashboardNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1/dashboard", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1/dashboard")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"deviceId":"device-1"`) || !strings.Contains(body, `"status":"unknown"`) || !strings.Contains(body, `"metricCards":[]`) {
-		t.Fatalf("unexpected dashboard placeholder response: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("unexpected dashboard placeholder response: %s", res.Body.String())
 	}
 }
 
@@ -87,6 +135,9 @@ func TestDeviceDashboardLoadedFromThingsBoard(t *testing.T) {
 	now := time.Now().UTC().UnixMilli()
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch r.URL.Path {
 		case "/api/device/device-1":
@@ -113,7 +164,7 @@ func TestDeviceDashboardLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1/dashboard", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1/dashboard")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -162,23 +213,25 @@ func TestSitesPlaceholderWhenThingsBoardNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites", nil)
+	req := authedRequest(http.MethodGet, "/api/v1/sites")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"items":[]`) || !strings.Contains(body, `"source":"thingsboard"`) || !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("unexpected placeholder response: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("unexpected placeholder response: %s", res.Body.String())
 	}
 }
 
 func TestSitesPlaceholderWhenThingsBoardUnauthorized(t *testing.T) {
 	t.Parallel()
 
-	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if requireBearerUser(t, w, r) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		_, _ = w.Write([]byte(`{"status":401,"message":"Authentication failed"}`))
@@ -195,7 +248,7 @@ func TestSitesPlaceholderWhenThingsBoardUnauthorized(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites", nil)
+	req := authedRequest(http.MethodGet, "/api/v1/sites")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -213,6 +266,9 @@ func TestSitesLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch {
 		case r.URL.Path == "/api/tenant/assets":
@@ -235,7 +291,7 @@ func TestSitesLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -245,6 +301,94 @@ func TestSitesLoadedFromThingsBoard(t *testing.T) {
 	body := res.Body.String()
 	if !strings.Contains(body, `"siteKey":"hq"`) || !strings.Contains(body, `"source":"thingsboard"`) {
 		t.Fatalf("unexpected sites response: %s", body)
+	}
+}
+
+func TestSitesCustomerUserUsesCustomerAssetsEndpoint(t *testing.T) {
+	t.Parallel()
+
+	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if requireBearerUser(t, w, r) {
+			return
+		}
+
+		switch {
+		case r.URL.Path == "/api/customer/customer-1/assets":
+			_, _ = w.Write([]byte(`{"data":[{"id":{"entityType":"ASSET","id":"asset-1"},"name":"HQ","type":"site"}],"hasNext":false}`))
+		case r.URL.Path == "/api/plugins/telemetry/ASSET/asset-1/values/attributes":
+			_, _ = w.Write([]byte(`[]`))
+		case r.URL.Path == "/api/tenant/assets":
+			t.Fatalf("customer user should not call tenant assets endpoint")
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer thingsBoard.Close()
+
+	router := NewRouter(config.Config{
+		Port:                "8080",
+		ThingsBoardBaseURL:  thingsBoard.URL,
+		ThingsBoardAPIKey:   "test-token",
+		ThingsBoardSiteType: "site",
+		CORSAllowedOrigins:  []string{"http://localhost:3000"},
+		CacheTTLSeconds:     30,
+		HasThingsBoardSetup: true,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	req := authedRequest(http.MethodGet, "/api/v1/sites")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	if !strings.Contains(res.Body.String(), `"siteKey":"hq"`) {
+		t.Fatalf("unexpected sites response: %s", res.Body.String())
+	}
+}
+
+func TestSitesTenantAdminUsesTenantAssetsEndpoint(t *testing.T) {
+	t.Parallel()
+
+	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
+
+		switch {
+		case r.URL.Path == "/api/tenant/assets":
+			_, _ = w.Write([]byte(`{"data":[{"id":{"entityType":"ASSET","id":"asset-1"},"name":"HQ","type":"site"}],"hasNext":false}`))
+		case r.URL.Path == "/api/plugins/telemetry/ASSET/asset-1/values/attributes":
+			_, _ = w.Write([]byte(`[]`))
+		case r.URL.Path == "/api/customer/customer-1/assets":
+			t.Fatalf("tenant admin should not call customer assets endpoint")
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer thingsBoard.Close()
+
+	router := NewRouter(config.Config{
+		Port:                "8080",
+		ThingsBoardBaseURL:  thingsBoard.URL,
+		ThingsBoardAPIKey:   "test-token",
+		ThingsBoardSiteType: "site",
+		CORSAllowedOrigins:  []string{"http://localhost:3000"},
+		CacheTTLSeconds:     30,
+		HasThingsBoardSetup: true,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	if !strings.Contains(res.Body.String(), `"siteKey":"hq"`) {
+		t.Fatalf("unexpected sites response: %s", res.Body.String())
 	}
 }
 
@@ -280,16 +424,15 @@ func TestSiteDevicesNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/headquarter/devices", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites/headquarter/devices")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"siteKey":"headquarter"`) || !strings.Contains(body, `"items":[]`) || !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("unexpected not configured response: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("unexpected not configured response: %s", res.Body.String())
 	}
 }
 
@@ -298,6 +441,9 @@ func TestSiteDevicesSiteNotFound(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch r.URL.Path {
 		case "/api/tenant/assets":
@@ -320,7 +466,7 @@ func TestSiteDevicesSiteNotFound(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/missing/devices", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites/missing/devices")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -337,6 +483,9 @@ func TestSiteDevicesLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch r.URL.Path {
 		case "/api/tenant/assets":
@@ -363,7 +512,7 @@ func TestSiteDevicesLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/headquarter/devices", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites/headquarter/devices")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -388,16 +537,15 @@ func TestDeviceDetailNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"item":null`) || !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("unexpected not configured response: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("unexpected not configured response: %s", res.Body.String())
 	}
 }
 
@@ -406,6 +554,9 @@ func TestDeviceDetailLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		if r.URL.Path != "/api/device/device-1" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -425,7 +576,7 @@ func TestDeviceDetailLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -450,16 +601,15 @@ func TestLatestTelemetryNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1/telemetry/latest", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1/telemetry/latest")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"deviceId":"device-1"`) || !strings.Contains(body, `"items":[]`) || !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("unexpected telemetry not configured response: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("unexpected telemetry not configured response: %s", res.Body.String())
 	}
 }
 
@@ -468,6 +618,9 @@ func TestLatestTelemetryLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		if r.URL.Path != "/api/plugins/telemetry/DEVICE/device-1/values/timeseries" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -487,7 +640,7 @@ func TestLatestTelemetryLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1/telemetry/latest", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1/telemetry/latest")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -512,16 +665,15 @@ func TestDeviceSummaryNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1/summary", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1/summary")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"item":null`) || !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("unexpected summary not configured response: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("unexpected summary not configured response: %s", res.Body.String())
 	}
 }
 
@@ -530,6 +682,9 @@ func TestDeviceSummaryLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch r.URL.Path {
 		case "/api/device/device-1":
@@ -552,7 +707,7 @@ func TestDeviceSummaryLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1/summary", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1/summary")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -573,6 +728,9 @@ func TestTelemetryHistoryLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		if r.URL.Path != "/api/plugins/telemetry/DEVICE/device-1/values/timeseries" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -596,7 +754,7 @@ func TestTelemetryHistoryLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1/telemetry/history?keys=cpu_usage&startTs=1710000000000&endTs=1710000060000&interval=60000", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1/telemetry/history?keys=cpu_usage&startTs=1710000000000&endTs=1710000060000&interval=60000")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -617,8 +775,11 @@ func TestTelemetryHistoryInfersNumericKeys(t *testing.T) {
 
 	requestCount := 0
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
+		requestCount++
 
 		if r.URL.Path != "/api/plugins/telemetry/DEVICE/device-1/values/timeseries" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -647,7 +808,7 @@ func TestTelemetryHistoryInfersNumericKeys(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1/telemetry/history", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/devices/device-1/telemetry/history")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -664,12 +825,16 @@ func TestDeviceAttributesLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-
-		if r.URL.Path != "/api/plugins/telemetry/DEVICE/device-1/values/attributes/SERVER_SCOPE" {
-			t.Fatalf("unexpected path %s", r.URL.Path)
+		if requireAdminBearerUser(t, w, r) {
+			return
 		}
 
-		_, _ = w.Write([]byte(`[{"key":"nmsIdentity","value":{"role":"gateway","vendor":"MikroTik"},"lastUpdateTs":1710000000000},{"key":"rack","value":"A1","lastUpdateTs":1710000000001}]`))
+		switch r.URL.Path {
+		case "/api/plugins/telemetry/DEVICE/device-1/values/attributes/SERVER_SCOPE":
+			_, _ = w.Write([]byte(`[{"key":"nmsIdentity","value":{"role":"gateway","vendor":"MikroTik"},"lastUpdateTs":1710000000000},{"key":"rack","value":"A1","lastUpdateTs":1710000000001}]`))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
 	}))
 	defer thingsBoard.Close()
 
@@ -684,6 +849,7 @@ func TestDeviceAttributesLoadedFromThingsBoard(t *testing.T) {
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/devices/device-1/attributes?scope=SERVER_SCOPE", nil)
+	req.Header.Set("Authorization", "Bearer admin-token")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -704,6 +870,9 @@ func TestAssetAttributesLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		if r.URL.Path != "/api/plugins/telemetry/ASSET/asset-1/values/attributes/SERVER_SCOPE" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -723,7 +892,7 @@ func TestAssetAttributesLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/assets/asset-1/attributes", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/assets/asset-1/attributes")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -745,16 +914,15 @@ func TestAlarmsNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/alarms", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/alarms")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"items":[]`) || !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("unexpected alarms not configured response: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("unexpected alarms not configured response: %s", res.Body.String())
 	}
 }
 
@@ -763,6 +931,9 @@ func TestAlarmsLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		if r.URL.Path != "/api/alarms" {
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -785,7 +956,7 @@ func TestAlarmsLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/alarms", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/alarms")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -814,13 +985,23 @@ func TestAlarmAckLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.Method != http.MethodPost {
-			t.Fatalf("expected POST, got %s", r.Method)
-		}
-		if r.URL.Path != "/api/alarm/alarm-1/ack" {
+		switch r.URL.Path {
+		case "/api/auth/user":
+			if got := r.Header.Get("X-Authorization"); got != "Bearer user-token" {
+				t.Fatalf("unexpected auth header %s", got)
+			}
+			_, _ = w.Write([]byte(`{"id":{"entityType":"USER","id":"user-1"},"tenantId":{"entityType":"TENANT","id":"tenant-1"},"customerId":{"entityType":"CUSTOMER","id":"customer-1"},"email":"admin@example.com","authority":"TENANT_ADMIN","firstName":"Admin","lastName":"User"}`))
+		case "/api/alarm/alarm-1/ack":
+			if r.Method != http.MethodPost {
+				t.Fatalf("expected POST, got %s", r.Method)
+			}
+			if got := r.Header.Get("X-Authorization"); got != "Bearer user-token" {
+				t.Fatalf("unexpected auth header %s", got)
+			}
+			_, _ = w.Write([]byte(`{"id":{"entityType":"ALARM","id":"alarm-1"},"createdTime":1710000000000,"type":"Link Down","severity":"CRITICAL","status":"ACTIVE_ACK","acknowledged":true,"cleared":false,"originator":{"entityType":"DEVICE","id":"device-1"},"originatorName":"hq-server-1","originatorLabel":"HQ Server 1","originatorDisplayName":"HQ Server 1","startTs":1710000000000,"endTs":1710000000000,"ackTs":1710000005000,"clearTs":0,"details":{}}`))
+		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
-		_, _ = w.Write([]byte(`{"id":{"entityType":"ALARM","id":"alarm-1"},"createdTime":1710000000000,"type":"Link Down","severity":"CRITICAL","status":"ACTIVE_ACK","acknowledged":true,"cleared":false,"originator":{"entityType":"DEVICE","id":"device-1"},"originatorName":"hq-server-1","originatorLabel":"HQ Server 1","originatorDisplayName":"HQ Server 1","startTs":1710000000000,"endTs":1710000000000,"ackTs":1710000005000,"clearTs":0,"details":{}}`))
 	}))
 	defer thingsBoard.Close()
 
@@ -835,6 +1016,7 @@ func TestAlarmAckLoadedFromThingsBoard(t *testing.T) {
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/alarms/alarm-1/ack", nil)
+	req.Header.Set("Authorization", "Bearer user-token")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -854,13 +1036,17 @@ func TestAlarmClearLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.Method != http.MethodPost {
-			t.Fatalf("expected POST, got %s", r.Method)
-		}
-		if r.URL.Path != "/api/alarm/alarm-1/clear" {
+		switch r.URL.Path {
+		case "/api/auth/user":
+			_, _ = w.Write([]byte(`{"id":{"entityType":"USER","id":"user-1"},"tenantId":{"entityType":"TENANT","id":"tenant-1"},"customerId":{"entityType":"CUSTOMER","id":"customer-1"},"email":"admin@example.com","authority":"TENANT_ADMIN","firstName":"Admin","lastName":"User"}`))
+		case "/api/alarm/alarm-1/clear":
+			if r.Method != http.MethodPost {
+				t.Fatalf("expected POST, got %s", r.Method)
+			}
+			_, _ = w.Write([]byte(`{"id":{"entityType":"ALARM","id":"alarm-1"},"createdTime":1710000000000,"type":"Link Down","severity":"CRITICAL","status":"CLEARED_ACK","acknowledged":true,"cleared":true,"originator":{"entityType":"DEVICE","id":"device-1"},"originatorName":"hq-server-1","originatorLabel":"HQ Server 1","originatorDisplayName":"HQ Server 1","startTs":1710000000000,"endTs":1710000000000,"ackTs":1710000005000,"clearTs":1710000010000,"details":{}}`))
+		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
-		_, _ = w.Write([]byte(`{"id":{"entityType":"ALARM","id":"alarm-1"},"createdTime":1710000000000,"type":"Link Down","severity":"CRITICAL","status":"CLEARED_ACK","acknowledged":true,"cleared":true,"originator":{"entityType":"DEVICE","id":"device-1"},"originatorName":"hq-server-1","originatorLabel":"HQ Server 1","originatorDisplayName":"HQ Server 1","startTs":1710000000000,"endTs":1710000000000,"ackTs":1710000005000,"clearTs":1710000010000,"details":{}}`))
 	}))
 	defer thingsBoard.Close()
 
@@ -875,6 +1061,7 @@ func TestAlarmClearLoadedFromThingsBoard(t *testing.T) {
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/alarms/alarm-1/clear", nil)
+	req.Header.Set("Authorization", "Bearer user-token")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -899,6 +1086,7 @@ func TestAlarmAckNotConfigured(t *testing.T) {
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/alarms/alarm-1/ack", nil)
+	req.Header.Set("Authorization", "Bearer user-token")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -907,11 +1095,63 @@ func TestAlarmAckNotConfigured(t *testing.T) {
 	}
 }
 
+func TestAuthLoginAndMe(t *testing.T) {
+	t.Parallel()
+
+	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/auth/login":
+			_, _ = w.Write([]byte(`{"token":"user-token","refreshToken":"refresh-token"}`))
+		case "/api/auth/user":
+			_, _ = w.Write([]byte(`{"id":{"entityType":"USER","id":"user-1"},"tenantId":{"entityType":"TENANT","id":"tenant-1"},"customerId":{"entityType":"CUSTOMER","id":"customer-1"},"email":"user@example.com","authority":"CUSTOMER_USER","firstName":"Customer","lastName":"User"}`))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer thingsBoard.Close()
+
+	router := NewRouter(config.Config{
+		Port:                "8080",
+		ThingsBoardBaseURL:  thingsBoard.URL,
+		ThingsBoardAPIKey:   "test-token",
+		ThingsBoardSiteType: "default",
+		CORSAllowedOrigins:  []string{"http://localhost:3000"},
+		CacheTTLSeconds:     30,
+		HasThingsBoardSetup: true,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{"username":"user@example.com","password":"secret"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	body := res.Body.String()
+	for _, expected := range []string{`"token":"user-token"`, `"refreshToken":"refresh-token"`, `"authority":"CUSTOMER_USER"`} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %s in login response: %s", expected, body)
+		}
+	}
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/v1/auth/me", nil)
+	req2.Header.Set("Authorization", "Bearer user-token")
+	res2 := httptest.NewRecorder()
+	router.ServeHTTP(res2, req2)
+	if res2.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res2.Code)
+	}
+}
+
 func TestSiteAlarmsLoadedFromThingsBoard(t *testing.T) {
 	t.Parallel()
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch r.URL.Path {
 		case "/api/tenant/assets":
@@ -940,7 +1180,7 @@ func TestSiteAlarmsLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/headquarter/alarms", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites/headquarter/alarms")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -968,6 +1208,9 @@ func TestSiteTopologyLoadedFromThingsBoard(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch {
 		case r.URL.Path == "/api/tenant/assets":
@@ -1000,7 +1243,7 @@ func TestSiteTopologyLoadedFromThingsBoard(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/br-b/topology", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites/br-b/topology")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -1063,16 +1306,15 @@ func TestSiteTopologyNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/br-b/topology", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites/br-b/topology")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"supported":false`) || !strings.Contains(body, `"nodes":[]`) || !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("unexpected topology not configured response: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("unexpected topology not configured response: %s", res.Body.String())
 	}
 }
 
@@ -1081,6 +1323,9 @@ func TestSiteTopologyMissingSnapshot(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch {
 		case r.URL.Path == "/api/tenant/assets":
@@ -1105,7 +1350,7 @@ func TestSiteTopologyMissingSnapshot(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/hq/topology", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites/hq/topology")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -1123,6 +1368,9 @@ func TestSiteTopologySiteNotFound(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch {
 		case r.URL.Path == "/api/tenant/assets":
@@ -1143,7 +1391,7 @@ func TestSiteTopologySiteNotFound(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/missing/topology", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites/missing/topology")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -1164,16 +1412,15 @@ func TestSiteAlarmsNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites/headquarter/alarms", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/sites/headquarter/alarms")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"items":[]`) || !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("unexpected site alarms not configured response: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("unexpected site alarms not configured response: %s", res.Body.String())
 	}
 }
 
@@ -1190,16 +1437,15 @@ func TestAlarmsConfiguredButUnreachable(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/alarms", nil)
+	req := authedRequest(http.MethodGet, "/api/v1/alarms")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status 401, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"items":[]`) || !strings.Contains(body, `could not be loaded`) {
-		t.Fatalf("expected empty alarms with error message: %s", body)
+	if !strings.Contains(res.Body.String(), `thingsboard request failed`) {
+		t.Fatalf("expected upstream auth failure: %s", res.Body.String())
 	}
 }
 
@@ -1212,16 +1458,15 @@ func TestReportSummaryNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/reports/summary", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/reports/summary")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("expected not configured message: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("expected not configured message: %s", res.Body.String())
 	}
 }
 
@@ -1234,16 +1479,15 @@ func TestReportSitesNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/reports/sites", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/reports/sites")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("expected not configured message: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("expected not configured message: %s", res.Body.String())
 	}
 }
 
@@ -1256,16 +1500,15 @@ func TestReportDevicesNotConfigured(t *testing.T) {
 		CacheTTLSeconds:    30,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/reports/devices", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/reports/devices")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", res.Code)
+	if res.Code != http.StatusBadGateway {
+		t.Fatalf("expected status 502, got %d", res.Code)
 	}
-	body := res.Body.String()
-	if !strings.Contains(body, `"ThingsBoard integration not configured"`) {
-		t.Fatalf("expected not configured message: %s", body)
+	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
+		t.Fatalf("expected not configured message: %s", res.Body.String())
 	}
 }
 
@@ -1274,6 +1517,9 @@ func TestReportSummaryAndSitesAndDevices(t *testing.T) {
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if requireAdminBearerUser(t, w, r) {
+			return
+		}
 
 		switch r.URL.Path {
 		case "/api/tenant/assets":
@@ -1319,7 +1565,7 @@ func TestReportSummaryAndSitesAndDevices(t *testing.T) {
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
 	// Test summary endpoint
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/reports/summary", nil)
+	req := adminAuthedRequest(http.MethodGet, "/api/v1/reports/summary")
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -1338,7 +1584,7 @@ func TestReportSummaryAndSitesAndDevices(t *testing.T) {
 	}
 
 	// Test sites endpoint
-	req2 := httptest.NewRequest(http.MethodGet, "/api/v1/reports/sites", nil)
+	req2 := adminAuthedRequest(http.MethodGet, "/api/v1/reports/sites")
 	res2 := httptest.NewRecorder()
 	router.ServeHTTP(res2, req2)
 
@@ -1357,7 +1603,7 @@ func TestReportSummaryAndSitesAndDevices(t *testing.T) {
 	}
 
 	// Test devices endpoint
-	req3 := httptest.NewRequest(http.MethodGet, "/api/v1/reports/devices", nil)
+	req3 := adminAuthedRequest(http.MethodGet, "/api/v1/reports/devices")
 	res3 := httptest.NewRecorder()
 	router.ServeHTTP(res3, req3)
 

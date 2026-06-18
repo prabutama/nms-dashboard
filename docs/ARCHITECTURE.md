@@ -9,8 +9,8 @@ Current rules:
 * BFF stays stateless.
 * No PostgreSQL.
 * No Redis.
-* No authentication.
-* No custom RBAC.
+* Authentication is rolling out through ThingsBoard user JWT.
+* Access control follows ThingsBoard authorities.
 * ThingsBoard remains source of truth.
 * Frontend calls only BFF.
 * Raw telemetry and attributes remain available for advanced/debug views.

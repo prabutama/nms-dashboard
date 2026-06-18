@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 
+import { useAuth } from "@/components/auth-provider";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { MetricCard, StatCard, StatusBadge } from "@/components/nms-ui";
 import { TelemetryChart } from "@/components/telemetry-chart";
@@ -10,22 +12,49 @@ import { fetchAttributes, fetchDeviceAlarms, fetchDeviceDashboard, fetchLatestTe
 import { formatBitrate, formatMetricValue } from "@/lib/format";
 import type { DashboardRoute, DeviceDashboardResponse } from "@/lib/types";
 
+const CHART_RANGES = [
+  { value: "1h", label: "1H" },
+  { value: "6h", label: "6H" },
+  { value: "24h", label: "24H" },
+  { value: "7d", label: "7D" },
+] as const;
+
+type ChartRange = (typeof CHART_RANGES)[number]["value"];
+
 export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const canReadDebug = user?.authority === "TENANT_ADMIN" || user?.authority === "SYS_ADMIN";
+  const range = normalizeChartRange(searchParams.get("range"));
   const dashboardQuery = useQuery({ queryKey: ["device-dashboard", deviceId], queryFn: () => fetchDeviceDashboard(deviceId), refetchInterval: 15_000 });
   const dashboard = dashboardQuery.data;
   const visibleCards = pickVisibleMetrics(dashboard);
   const visibleGroups = pickVisibleGroups(dashboard);
   const chartKeys = pickChartKeys(dashboard);
+  const historyParams = getHistoryRangeParams(range);
   const historyQuery = useQuery({
-    queryKey: ["telemetry-history", deviceId, chartKeys.join(",")],
-    queryFn: () => fetchTelemetryHistory(deviceId, chartKeys),
+    queryKey: ["telemetry-history", deviceId, range, chartKeys.join(",")],
+    queryFn: () => fetchTelemetryHistory(deviceId, { keys: chartKeys, ...historyParams }),
     enabled: chartKeys.length > 0,
-    refetchInterval: 30_000,
+    refetchInterval: range === "7d" ? 60_000 : 30_000,
   });
   const telemetryQuery = useQuery({ queryKey: ["latest-telemetry", deviceId], queryFn: () => fetchLatestTelemetry(deviceId), refetchInterval: 15_000 });
-  const attributesQuery = useQuery({ queryKey: ["device-attributes", deviceId], queryFn: () => fetchAttributes("devices", deviceId), refetchInterval: 60_000 });
+  const attributesQuery = useQuery({ queryKey: ["device-attributes", deviceId], queryFn: () => fetchAttributes("devices", deviceId), refetchInterval: 60_000, enabled: canReadDebug });
   const alarmsQuery = useQuery({ queryKey: ["device-alarms", deviceId], queryFn: () => fetchDeviceAlarms(deviceId), refetchInterval: 15000 });
   const metricMeta = new Map(dashboard?.metricCards.map((metric) => [metric.key, metric]) || []);
+  const visibleChartSeries = (historyQuery.data?.series || []).filter((series) => series.numeric && series.points.some((point) => point.numeric));
+
+  const setRange = (nextRange: ChartRange) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextRange === "24h") {
+      params.delete("range");
+    } else {
+      params.set("range", nextRange);
+    }
+    const qs = params.toString();
+    router.replace(`/devices/${deviceId}${qs ? `?${qs}` : ""}`);
+  };
 
   return (
     <DashboardShell title={dashboard?.device.label || dashboard?.device.name || "Device Detail"} subtitle="Focused device operations view with normalized metrics and debug data separated.">
@@ -90,15 +119,34 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
           </div>
 
           <div className="border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold text-slate-700">Telemetry Charts</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Selected operational trends. Raw telemetry in Debug.</p>
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-700">Telemetry Charts</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">Historical charts for selected operational metrics. Full raw telemetry remains in Advanced / Debug.</p>
+              </div>
+              <div className="flex gap-px">
+                {CHART_RANGES.map((item) => (
+                  <button key={item.value} onClick={() => setRange(item.value)} className={`px-3 py-1.5 text-[11px] font-medium transition ${range === item.value ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-100"}`}>
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
+            {chartKeys.length === 0 ? <p className="px-4 py-5 text-xs text-slate-500">No chartable metrics available for this device.</p> : null}
             {historyQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-500">Loading charts...</p> : null}
             {historyQuery.error ? <p className="px-4 py-5 text-xs text-red-600">{historyQuery.error.message}</p> : null}
+            {chartKeys.length > 0 && historyQuery.data && historyQuery.data.series.length === 0 ? <p className="px-4 py-5 text-xs text-slate-500">{historyQuery.data.message || "No telemetry history available for selected time window."}</p> : null}
+            {chartKeys.length > 0 && historyQuery.data && historyQuery.data.series.length > 0 && visibleChartSeries.length === 0 ? <p className="px-4 py-5 text-xs text-slate-500">No numeric chart data available in selected time window.</p> : null}
             <div className="grid gap-4 p-4 xl:grid-cols-2">
-              {(historyQuery.data?.series || []).filter((series) => series.numeric).map((series) => (
-                <TelemetryChart key={series.key} series={series} title={metricMeta.get(series.key)?.label} unit={metricMeta.get(series.key)?.unit} />
+              {visibleChartSeries.map((series) => (
+                <TelemetryChart
+                  key={series.key}
+                  series={series}
+                  title={metricMeta.get(series.key)?.label}
+                  unit={metricMeta.get(series.key)?.unit}
+                  warn={metricMeta.get(series.key)?.warn}
+                  critical={metricMeta.get(series.key)?.critical}
+                />
               ))}
             </div>
           </div>
@@ -147,6 +195,7 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
             ) : null}
           </div>
 
+          {canReadDebug ? (
           <details className="border border-slate-200 bg-white">
             <summary className="cursor-pointer bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-700">Advanced / Debug</summary>
             <div className="grid gap-4 p-4 xl:grid-cols-2">
@@ -160,6 +209,7 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
               </div>
             </div>
           </details>
+          ) : null}
         </>
       ) : null}
     </DashboardShell>
@@ -217,7 +267,14 @@ function pickChartKeys(dashboard?: DeviceDashboardResponse) {
     .filter((metric) => metric.group === "storage" && metric.key.endsWith("used_pct") && Number(metric.value) > 0)
     .slice(0, 2)
     .map((metric) => metric.key);
-  return Array.from(new Set([...keys, ...interfaceThroughput, ...storageUsage])).slice(0, 9);
+  const fallback = dashboard.metricCards
+    .filter((metric) => metric.numeric)
+    .filter((metric) => ["availability", "system", "interfaces", "storage", "other"].includes(metric.group))
+    .filter((metric) => !metric.key.endsWith("oper_status") && !metric.key.endsWith("admin_status") && metric.key !== "icmp.reachable")
+    .filter((metric) => Number.isFinite(Number(metric.value)))
+    .sort((a, b) => a.displayOrder - b.displayOrder)
+    .map((metric) => metric.key);
+  return Array.from(new Set([...keys, ...interfaceThroughput, ...storageUsage, ...fallback])).slice(0, 6);
 }
 
 function isOperationalMetric(metric: DeviceDashboardResponse["metricCards"][number]) {
@@ -231,6 +288,25 @@ function isOperationalMetric(metric: DeviceDashboardResponse["metricCards"][numb
     return ["used_pct", "used_bytes", "total_bytes", "free_bytes"].some((suffix) => metric.key.endsWith(suffix)) && Number(metric.value) > 0;
   }
   return metric.status === "critical" || metric.status === "warning";
+}
+
+function normalizeChartRange(value: string | null): ChartRange {
+  return CHART_RANGES.some((item) => item.value === value) ? (value as ChartRange) : "24h";
+}
+
+function getHistoryRangeParams(range: ChartRange) {
+  const endTs = Date.now();
+  switch (range) {
+    case "1h":
+      return { startTs: endTs - 60 * 60 * 1000, endTs, interval: 60 * 1000, limit: 120 };
+    case "6h":
+      return { startTs: endTs - 6 * 60 * 60 * 1000, endTs, interval: 5 * 60 * 1000, limit: 120 };
+    case "7d":
+      return { startTs: endTs - 7 * 24 * 60 * 60 * 1000, endTs, interval: 60 * 60 * 1000, limit: 168 };
+    case "24h":
+    default:
+      return { startTs: endTs - 24 * 60 * 60 * 1000, endTs, interval: 15 * 60 * 1000, limit: 120 };
+  }
 }
 
 function InterfaceTable({ items }: { items: DeviceDashboardResponse["interfaces"] }) {
@@ -377,4 +453,3 @@ function routeSortKey(route: DashboardRoute) {
 function InfoCell({ label, value }: { label: string; value: string | number }) {
   return <div><p className="text-[11px] text-slate-500">{label}</p><p className="mt-0.5 text-xs font-semibold text-slate-950">{value}</p></div>;
 }
-

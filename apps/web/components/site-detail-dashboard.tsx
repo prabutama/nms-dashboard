@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
+import { useAuth } from "@/components/auth-provider";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { DeviceLink, StatCard, StatusBadge } from "@/components/nms-ui";
 import { fetchAttributes, fetchSiteAlarms, fetchSiteDevices, fetchSites, fetchSiteTopology } from "@/lib/api";
@@ -13,6 +14,8 @@ function tsDisplay(ts?: string) {
 }
 
 export function SiteDetailDashboard({ siteKey }: { siteKey: string }) {
+  const { user } = useAuth();
+  const canReadDebug = user?.authority === "TENANT_ADMIN" || user?.authority === "SYS_ADMIN";
   const sitesQuery = useQuery({ queryKey: ["sites"], queryFn: fetchSites, refetchInterval: 60_000 });
   const devicesQuery = useQuery({ queryKey: ["site-devices", siteKey], queryFn: () => fetchSiteDevices(siteKey), refetchInterval: 60_000 });
   const site = sitesQuery.data?.items.find((item) => item.siteKey === siteKey);
@@ -130,10 +133,12 @@ export function SiteDetailDashboard({ siteKey }: { siteKey: string }) {
         </div>
       ) : null}
 
+      {canReadDebug ? (
       <details className="border border-slate-200 bg-white">
         <summary className="cursor-pointer bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-700">Advanced / Debug: site attributes</summary>
         <pre className="max-h-96 overflow-auto bg-slate-50 px-4 py-4 text-xs text-slate-600">{JSON.stringify(attributesQuery.data || {}, null, 2)}</pre>
       </details>
+      ) : null}
     </DashboardShell>
   );
 }

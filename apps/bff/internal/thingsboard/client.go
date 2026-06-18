@@ -22,6 +22,21 @@ type Client struct {
 	httpClient *http.Client
 }
 
+type LoginResponse struct {
+	Token        string `json:"token"`
+	RefreshToken string `json:"refreshToken"`
+}
+
+type UserInfo struct {
+	ID         string
+	Email      string
+	Authority  string
+	FirstName  string
+	LastName   string
+	CustomerID string
+	TenantID   string
+}
+
 type Config struct {
 	BaseURL string
 	APIKey  string
@@ -59,6 +74,16 @@ func (c *Client) CheckStatus(ctx context.Context, assetType string) error {
 	return c.getJSON(ctx, "/api/tenant/assets", query, &response)
 }
 
+func (c *Client) CheckStatusWithBearer(ctx context.Context, bearerToken string, assetType string) error {
+	query := url.Values{}
+	query.Set("pageSize", "1")
+	query.Set("page", "0")
+	query.Set("type", assetType)
+
+	var response assetPageResponse
+	return c.getJSONWithBearer(ctx, "/api/tenant/assets", query, bearerToken, &response)
+}
+
 func (c *Client) ListAssetsByType(ctx context.Context, assetType string) ([]Asset, error) {
 	assets := make([]Asset, 0)
 	page := 0
@@ -92,6 +117,59 @@ func (c *Client) ListAssetsByType(ctx context.Context, assetType string) ([]Asse
 	return assets, nil
 }
 
+func (c *Client) ListAssetsByTypeWithBearer(ctx context.Context, bearerToken string, assetType string) ([]Asset, error) {
+	assets := make([]Asset, 0)
+	page := 0
+
+	for {
+		query := url.Values{}
+		query.Set("pageSize", "100")
+		query.Set("page", strconv.Itoa(page))
+		query.Set("type", assetType)
+
+		var response assetPageResponse
+		if err := c.getJSONWithBearer(ctx, "/api/tenant/assets", query, bearerToken, &response); err != nil {
+			return nil, err
+		}
+
+		for _, item := range response.Data {
+			assets = append(assets, Asset{ID: item.ID.ID, Name: item.Name, Type: item.Type})
+		}
+		if !response.HasNext {
+			break
+		}
+		page++
+	}
+	return assets, nil
+}
+
+func (c *Client) ListCustomerAssetsByTypeWithBearer(ctx context.Context, bearerToken string, customerID string, assetType string) ([]Asset, error) {
+	assets := make([]Asset, 0)
+	page := 0
+
+	for {
+		query := url.Values{}
+		query.Set("pageSize", "100")
+		query.Set("page", strconv.Itoa(page))
+		query.Set("type", assetType)
+
+		var response assetPageResponse
+		if err := c.getJSONWithBearer(ctx, "/api/customer/"+customerID+"/assets", query, bearerToken, &response); err != nil {
+			return nil, err
+		}
+
+		for _, item := range response.Data {
+			assets = append(assets, Asset{ID: item.ID.ID, Name: item.Name, Type: item.Type})
+		}
+		if !response.HasNext {
+			break
+		}
+		page++
+	}
+
+	return assets, nil
+}
+
 func (c *Client) GetAssetAttributes(ctx context.Context, assetID string, keys []string) (map[string]string, error) {
 	query := url.Values{}
 	query.Set("keys", strings.Join(keys, ","))
@@ -106,6 +184,21 @@ func (c *Client) GetAssetAttributes(ctx context.Context, assetID string, keys []
 		attributes[item.Key] = stringifyValue(item.Value)
 	}
 
+	return attributes, nil
+}
+
+func (c *Client) GetAssetAttributesWithBearer(ctx context.Context, bearerToken string, assetID string, keys []string) (map[string]string, error) {
+	query := url.Values{}
+	query.Set("keys", strings.Join(keys, ","))
+
+	var response []attributeKVResponse
+	if err := c.getJSONWithBearer(ctx, "/api/plugins/telemetry/ASSET/"+assetID+"/values/attributes", query, bearerToken, &response); err != nil {
+		return nil, err
+	}
+	attributes := make(map[string]string, len(response))
+	for _, item := range response {
+		attributes[item.Key] = stringifyValue(item.Value)
+	}
 	return attributes, nil
 }
 
@@ -133,6 +226,22 @@ func (c *Client) GetEntityAttributes(ctx context.Context, entityType string, ent
 	return attributes, nil
 }
 
+func (c *Client) GetEntityAttributesWithBearer(ctx context.Context, bearerToken string, entityType string, entityID string, scope string, keys []string) ([]Attribute, error) {
+	query := url.Values{}
+	if len(keys) > 0 {
+		query.Set("keys", strings.Join(keys, ","))
+	}
+	var response []attributeKVResponse
+	if err := c.getJSONWithBearer(ctx, "/api/plugins/telemetry/"+entityType+"/"+entityID+"/values/attributes/"+scope, query, bearerToken, &response); err != nil {
+		return nil, err
+	}
+	attributes := make([]Attribute, 0, len(response))
+	for _, item := range response {
+		attributes = append(attributes, Attribute{Key: item.Key, Value: item.Value, ValueType: valueType(item.Value), LastUpdateTs: item.LastUpdateTs})
+	}
+	return attributes, nil
+}
+
 func (c *Client) GetAssetRelations(ctx context.Context, assetID string) ([]Relation, error) {
 	query := url.Values{}
 	query.Set("fromId", assetID)
@@ -155,6 +264,21 @@ func (c *Client) GetAssetRelations(ctx context.Context, assetID string) ([]Relat
 	return relations, nil
 }
 
+func (c *Client) GetAssetRelationsWithBearer(ctx context.Context, bearerToken string, assetID string) ([]Relation, error) {
+	query := url.Values{}
+	query.Set("fromId", assetID)
+	query.Set("fromType", "ASSET")
+	var response []relationInfoResponse
+	if err := c.getJSONWithBearer(ctx, "/api/relations/info", query, bearerToken, &response); err != nil {
+		return nil, err
+	}
+	relations := make([]Relation, 0, len(response))
+	for _, item := range response {
+		relations = append(relations, Relation{ToID: item.To.ID, ToType: item.To.EntityType, RelationType: item.Type})
+	}
+	return relations, nil
+}
+
 func (c *Client) GetDevice(ctx context.Context, deviceID string) (Device, error) {
 	var response deviceResponse
 	if err := c.getJSON(ctx, "/api/device/"+deviceID, nil, &response); err != nil {
@@ -168,6 +292,14 @@ func (c *Client) GetDevice(ctx context.Context, deviceID string) (Device, error)
 		Label: response.Label,
 		Asset: response.DeviceProfileName,
 	}, nil
+}
+
+func (c *Client) GetDeviceWithBearer(ctx context.Context, bearerToken string, deviceID string) (Device, error) {
+	var response deviceResponse
+	if err := c.getJSONWithBearer(ctx, "/api/device/"+deviceID, nil, bearerToken, &response); err != nil {
+		return Device{}, err
+	}
+	return Device{ID: response.ID.ID, Name: response.Name, Type: response.Type, Label: response.Label, Asset: response.DeviceProfileName}, nil
 }
 
 func (c *Client) GetLatestTelemetry(ctx context.Context, deviceID string) ([]TelemetryValue, error) {
@@ -189,6 +321,21 @@ func (c *Client) GetLatestTelemetry(ctx context.Context, deviceID string) ([]Tel
 		})
 	}
 
+	return items, nil
+}
+
+func (c *Client) GetLatestTelemetryWithBearer(ctx context.Context, bearerToken string, deviceID string) ([]TelemetryValue, error) {
+	var response map[string][]telemetryValueResponse
+	if err := c.getJSONWithBearer(ctx, "/api/plugins/telemetry/DEVICE/"+deviceID+"/values/timeseries", nil, bearerToken, &response); err != nil {
+		return nil, err
+	}
+	items := make([]TelemetryValue, 0, len(response))
+	for key, values := range response {
+		if len(values) == 0 {
+			continue
+		}
+		items = append(items, TelemetryValue{Key: key, Value: stringifyValue(values[0].Value), Timestamp: values[0].Timestamp})
+	}
 	return items, nil
 }
 
@@ -238,9 +385,48 @@ func (c *Client) GetTelemetryHistory(ctx context.Context, deviceID string, keys 
 	return series, nil
 }
 
+func (c *Client) GetTelemetryHistoryWithBearer(ctx context.Context, bearerToken string, deviceID string, keys []string, startTs int64, endTs int64, interval int64, limit int) ([]TelemetrySeries, error) {
+	query := url.Values{}
+	if len(keys) > 0 {
+		query.Set("keys", strings.Join(keys, ","))
+	}
+	query.Set("startTs", strconv.FormatInt(startTs, 10))
+	query.Set("endTs", strconv.FormatInt(endTs, 10))
+	query.Set("interval", strconv.FormatInt(interval, 10))
+	query.Set("limit", strconv.Itoa(limit))
+	query.Set("agg", "AVG")
+	var response map[string][]telemetryValueResponse
+	if err := c.getJSONWithBearer(ctx, "/api/plugins/telemetry/DEVICE/"+deviceID+"/values/timeseries", query, bearerToken, &response); err != nil {
+		return nil, err
+	}
+	series := make([]TelemetrySeries, 0, len(response))
+	for key, values := range response {
+		points := make([]TelemetryPoint, 0, len(values))
+		numericSeries := true
+		for _, value := range values {
+			rawValue := stringifyValue(value.Value)
+			numericValue, numeric := parseNumeric(value.Value)
+			if !numeric {
+				numericSeries = false
+			}
+			points = append(points, TelemetryPoint{Timestamp: value.Timestamp, Value: numericValue, RawValue: rawValue, Numeric: numeric})
+		}
+		series = append(series, TelemetrySeries{Key: key, Points: points, Numeric: numericSeries && len(points) > 0})
+	}
+	return series, nil
+}
+
 func (c *Client) AcknowledgeAlarm(ctx context.Context, alarmID string) (AlarmInfo, error) {
 	var response AlarmInfo
 	if err := c.postJSON(ctx, "/api/alarm/"+alarmID+"/ack", nil, &response); err != nil {
+		return AlarmInfo{}, err
+	}
+	return response, nil
+}
+
+func (c *Client) AcknowledgeAlarmWithBearer(ctx context.Context, bearerToken string, alarmID string) (AlarmInfo, error) {
+	var response AlarmInfo
+	if err := c.postJSONWithBearer(ctx, "/api/alarm/"+alarmID+"/ack", nil, bearerToken, &response); err != nil {
 		return AlarmInfo{}, err
 	}
 	return response, nil
@@ -252,6 +438,50 @@ func (c *Client) ClearAlarm(ctx context.Context, alarmID string) (AlarmInfo, err
 		return AlarmInfo{}, err
 	}
 	return response, nil
+}
+
+func (c *Client) ClearAlarmWithBearer(ctx context.Context, bearerToken string, alarmID string) (AlarmInfo, error) {
+	var response AlarmInfo
+	if err := c.postJSONWithBearer(ctx, "/api/alarm/"+alarmID+"/clear", nil, bearerToken, &response); err != nil {
+		return AlarmInfo{}, err
+	}
+	return response, nil
+}
+
+func (c *Client) Login(ctx context.Context, username string, password string) (LoginResponse, error) {
+	var response LoginResponse
+	if err := c.postJSON(ctx, "/api/auth/login", map[string]string{"username": username, "password": password}, &response); err != nil {
+		return LoginResponse{}, err
+	}
+	return response, nil
+}
+
+func (c *Client) RefreshToken(ctx context.Context, refreshToken string) (LoginResponse, error) {
+	var response LoginResponse
+	if err := c.postJSON(ctx, "/api/auth/token", map[string]string{"refreshToken": refreshToken}, &response); err != nil {
+		return LoginResponse{}, err
+	}
+	return response, nil
+}
+
+func (c *Client) GetCurrentUser(ctx context.Context, bearerToken string) (UserInfo, error) {
+	var response userResponse
+	if err := c.getJSONWithBearer(ctx, "/api/auth/user", nil, bearerToken, &response); err != nil {
+		return UserInfo{}, err
+	}
+	return UserInfo{
+		ID:         response.ID.ID,
+		Email:      response.Email,
+		Authority:  response.Authority,
+		FirstName:  response.FirstName,
+		LastName:   response.LastName,
+		CustomerID: response.CustomerID.ID,
+		TenantID:   response.TenantID.ID,
+	}, nil
+}
+
+func (c *Client) Logout(ctx context.Context, bearerToken string) error {
+	return c.postJSONWithBearer(ctx, "/api/auth/logout", nil, bearerToken, nil)
 }
 
 func (c *Client) getJSON(ctx context.Context, endpoint string, query url.Values, target any) error {
@@ -288,12 +518,27 @@ func (c *Client) getJSON(ctx context.Context, endpoint string, query url.Values,
 	return nil
 }
 
+func (c *Client) getJSONWithBearer(ctx context.Context, endpoint string, query url.Values, bearerToken string, target any) error {
+	return c.doJSONRequest(ctx, http.MethodGet, endpoint, query, nil, "Bearer "+bearerToken, target)
+}
+
 func (c *Client) postJSON(ctx context.Context, endpoint string, body any, target any) error {
+	return c.doJSONRequest(ctx, http.MethodPost, endpoint, nil, body, "ApiKey "+c.apiKey, target)
+}
+
+func (c *Client) postJSONWithBearer(ctx context.Context, endpoint string, body any, bearerToken string, target any) error {
+	return c.doJSONRequest(ctx, http.MethodPost, endpoint, nil, body, "Bearer "+bearerToken, target)
+}
+
+func (c *Client) doJSONRequest(ctx context.Context, method string, endpoint string, query url.Values, body any, authHeader string, target any) error {
 	reqCtx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
 
 	requestURL := *c.baseURL
 	requestURL.Path = path.Join(requestURL.Path, endpoint)
+	if query != nil {
+		requestURL.RawQuery = query.Encode()
+	}
 
 	var reader io.Reader
 	if body != nil {
@@ -304,13 +549,13 @@ func (c *Client) postJSON(ctx context.Context, endpoint string, body any, target
 		reader = strings.NewReader(string(payload))
 	}
 
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, requestURL.String(), reader)
+	req, err := http.NewRequestWithContext(reqCtx, method, requestURL.String(), reader)
 	if err != nil {
 		return fmt.Errorf("build thingsboard request: %w", err)
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("X-Authorization", "ApiKey "+c.apiKey)
+	req.Header.Set("X-Authorization", authHeader)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -442,6 +687,15 @@ func (c *Client) ListAlarms(ctx context.Context, query AlarmQuery) (AlarmPage, e
 	}, nil
 }
 
+func (c *Client) ListAlarmsWithBearer(ctx context.Context, bearerToken string, query AlarmQuery) (AlarmPage, error) {
+	q := buildAlarmQuery(query)
+	var response alarmPageResponse
+	if err := c.getJSONWithBearer(ctx, "/api/alarms", q, bearerToken, &response); err != nil {
+		return AlarmPage{}, err
+	}
+	return AlarmPage{Items: response.Data, Page: response.Page, PageSize: response.PageSize, Total: response.TotalElements, HasNext: response.HasNext}, nil
+}
+
 func (c *Client) ListEntityAlarms(ctx context.Context, entityType string, entityID string, query AlarmQuery) (AlarmPage, error) {
 	q := buildAlarmQuery(query)
 
@@ -458,6 +712,16 @@ func (c *Client) ListEntityAlarms(ctx context.Context, entityType string, entity
 		Total:    response.TotalElements,
 		HasNext:  response.HasNext,
 	}, nil
+}
+
+func (c *Client) ListEntityAlarmsWithBearer(ctx context.Context, bearerToken string, entityType string, entityID string, query AlarmQuery) (AlarmPage, error) {
+	q := buildAlarmQuery(query)
+	endpoint := "/api/alarm/" + entityType + "/" + entityID
+	var response alarmPageResponse
+	if err := c.getJSONWithBearer(ctx, endpoint, q, bearerToken, &response); err != nil {
+		return AlarmPage{}, err
+	}
+	return AlarmPage{Items: response.Data, Page: response.Page, PageSize: response.PageSize, Total: response.TotalElements, HasNext: response.HasNext}, nil
 }
 
 func buildAlarmQuery(query AlarmQuery) url.Values {
@@ -578,6 +842,16 @@ type deviceResponse struct {
 	Type              string           `json:"type"`
 	Label             string           `json:"label"`
 	DeviceProfileName string           `json:"deviceProfileName"`
+}
+
+type userResponse struct {
+	ID         entityIDResponse `json:"id"`
+	TenantID   entityIDResponse `json:"tenantId"`
+	CustomerID entityIDResponse `json:"customerId"`
+	Email      string           `json:"email"`
+	Authority  string           `json:"authority"`
+	FirstName  string           `json:"firstName"`
+	LastName   string           `json:"lastName"`
 }
 
 type telemetryValueResponse struct {

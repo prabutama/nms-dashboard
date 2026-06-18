@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Activity, Bell, Database, FileText, Home, Map, Server, Settings } from "lucide-react";
+
+import { useAuth } from "@/components/auth-provider";
 
 const navItems = [
   { href: "/", label: "Overview", icon: Home },
@@ -10,11 +12,18 @@ const navItems = [
   { href: "/devices", label: "Devices", icon: Server },
   { href: "/alarms", label: "Alarms", icon: Bell },
   { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
 ];
 
 export function DashboardShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, isAuthenticated, logout, ready } = useAuth();
+
+  if (ready && !isAuthenticated) {
+    router.replace("/login");
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -31,7 +40,7 @@ export function DashboardShell({ title, subtitle, children }: { title: string; s
           </div>
 
           <nav className="flex-1 space-y-0.5 px-3 py-4">
-            {navItems.map((item) => {
+            {navItems.filter((item) => !item.adminOnly || user?.authority === "TENANT_ADMIN" || user?.authority === "SYS_ADMIN").map((item) => {
               const Icon = item.icon;
               const selected = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
@@ -44,8 +53,21 @@ export function DashboardShell({ title, subtitle, children }: { title: string; s
           </nav>
 
           <div className="border-t border-slate-200 px-5 py-4">
-            <p className="text-[11px] font-semibold text-slate-700">BFF protected boundary</p>
-            <p className="mt-1 text-[11px] text-slate-500">Frontend reads normalized NMS data only. Credentials stay server-side.</p>
+            {isAuthenticated && user ? (
+              <div className="space-y-2">
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-700">{user.firstName || user.email}</p>
+                  <p className="mt-1 text-[11px] text-slate-500">{user.authority}</p>
+                </div>
+                <button type="button" onClick={() => void logout()} className="border border-slate-300 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50">Logout</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold text-slate-700">Guest</p>
+                <p className="mt-1 text-[11px] text-slate-500">Sign in with ThingsBoard user.</p>
+                <Link href="/login" className="inline-flex border border-blue-700 bg-blue-700 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-800">Login</Link>
+              </div>
+            )}
           </div>
         </div>
       </aside>

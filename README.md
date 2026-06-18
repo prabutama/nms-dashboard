@@ -9,8 +9,8 @@ Phase 3 combines ThingsBoard telemetry and attributes into normalized NMS dashbo
 * stateless BFF
 * no persistent database
 * no Redis in MVP
-* no authentication yet
-* no custom RBAC yet
+* authentication via ThingsBoard user JWT is in rollout
+* authority-based access follows ThingsBoard roles (`TENANT_ADMIN`, `CUSTOMER_USER`)
 * frontend never calls ThingsBoard directly
 
 ## Project structure

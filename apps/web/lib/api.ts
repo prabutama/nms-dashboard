@@ -1,7 +1,9 @@
 import { getApiBaseUrl } from "@/lib/config";
+import { getAccessToken, readStoredAuth, writeStoredAuth } from "@/lib/auth";
 import type {
   AlarmActionResponse,
   AlarmListResponse,
+  AuthResponse,
   AttributesResponse,
   DeviceDashboardResponse,
   LatestTelemetryResponse,
@@ -14,18 +16,25 @@ import type {
   TelemetryHistoryResponse,
 } from "@/lib/types";
 
-async function getJSON<T>(path: string): Promise<T> {
+async function getJSON<T>(path: string, retryOnAuth = true): Promise<T> {
   let response: Response;
+  const token = getAccessToken();
 
   try {
     response = await fetch(`${getApiBaseUrl()}${path}`, {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       cache: "no-store",
     });
   } catch {
     throw new Error(`Cannot reach BFF at ${getApiBaseUrl()}.`);
   }
 
+  if (retryOnAuth && response.status === 401) {
+    const retried = await tryRefreshAndRetry(() => getJSON<T>(path, false));
+    if (retried) {
+      return retried;
+    }
+  }
   if (!response.ok) {
     throw new Error(`BFF returned ${response.status} for ${path}.`);
   }
@@ -33,14 +42,16 @@ async function getJSON<T>(path: string): Promise<T> {
   return response.json();
 }
 
-async function postJSON<T>(path: string, body?: unknown): Promise<T> {
+async function postJSON<T>(path: string, body?: unknown, retryOnAuth = true): Promise<T> {
   let response: Response;
+  const token = getAccessToken();
 
   try {
     response = await fetch(`${getApiBaseUrl()}${path}`, {
       method: "POST",
       headers: {
         Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
       },
       cache: "no-store",
@@ -50,11 +61,58 @@ async function postJSON<T>(path: string, body?: unknown): Promise<T> {
     throw new Error(`Cannot reach BFF at ${getApiBaseUrl()}.`);
   }
 
+  if (retryOnAuth && response.status === 401) {
+    const retried = await tryRefreshAndRetry(() => postJSON<T>(path, body, false));
+    if (retried) {
+      return retried;
+    }
+  }
   if (!response.ok) {
     throw new Error(`BFF returned ${response.status} for ${path}.`);
   }
 
   return response.json();
+}
+
+async function tryRefreshAndRetry<T>(retry: () => Promise<T>) {
+  const stored = readStoredAuth();
+  if (!stored?.refreshToken) {
+    return null;
+  }
+  try {
+    const refreshed = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ refreshToken: stored.refreshToken }),
+    });
+    if (!refreshed.ok) {
+      writeStoredAuth(null);
+      return null;
+    }
+    const payload = await refreshed.json() as AuthResponse;
+    writeStoredAuth({
+      token: payload.token || "",
+      refreshToken: payload.refreshToken || stored.refreshToken,
+      user: payload.user,
+    });
+    return await retry();
+  } catch {
+    writeStoredAuth(null);
+    return null;
+  }
+}
+
+export function login(username: string, password: string) {
+  return postJSON<AuthResponse>("/api/v1/auth/login", { username, password });
+}
+
+export function me() {
+  return getJSON<AuthResponse>("/api/v1/auth/me");
+}
+
+export function logout() {
+  return postJSON<{ ok: boolean; message?: string }>("/api/v1/auth/logout");
 }
 
 export function fetchAlarms(params?: { searchStatus?: string; page?: number; pageSize?: number }) {
@@ -86,9 +144,16 @@ export function fetchDeviceDashboard(deviceId: string) {
   return getJSON<DeviceDashboardResponse>(`/api/v1/devices/${deviceId}/dashboard`);
 }
 
-export function fetchTelemetryHistory(deviceId: string, keys?: string[]) {
-  const query = keys && keys.length > 0 ? `?keys=${encodeURIComponent(keys.join(","))}` : "";
-  return getJSON<TelemetryHistoryResponse>(`/api/v1/devices/${deviceId}/telemetry/history${query}`);
+export function fetchTelemetryHistory(deviceId: string, options?: { keys?: string[]; startTs?: number; endTs?: number; interval?: number; limit?: number }) {
+  const query = new URLSearchParams();
+  if (options?.keys && options.keys.length > 0) query.set("keys", options.keys.join(","));
+  if (options?.startTs !== undefined) query.set("startTs", String(options.startTs));
+  if (options?.endTs !== undefined) query.set("endTs", String(options.endTs));
+  if (options?.interval !== undefined) query.set("interval", String(options.interval));
+  if (options?.limit !== undefined) query.set("limit", String(options.limit));
+  const qs = query.toString();
+  const suffix = qs ? `?${qs}` : "";
+  return getJSON<TelemetryHistoryResponse>(`/api/v1/devices/${deviceId}/telemetry/history${suffix}`);
 }
 
 export function fetchSiteAlarms(siteKey: string, params?: { searchStatus?: string; status?: string; page?: number; pageSize?: number }) {

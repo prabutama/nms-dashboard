@@ -245,6 +245,24 @@ export type AlarmActionResponse = {
   message?: string;
 };
 
+export type AuthUser = {
+  id: string;
+  email: string;
+  authority: string;
+  firstName?: string;
+  lastName?: string;
+  customerId?: string;
+  tenantId?: string;
+};
+
+export type AuthResponse = {
+  user: AuthUser;
+  token?: string;
+  refreshToken?: string;
+  source?: string;
+  message?: string;
+};
+
 export type SiteTopologyResponse = {
   site: {
     siteKey: string;
