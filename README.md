@@ -183,6 +183,59 @@ BFF: `http://localhost:8080`
 * `NEXT_PUBLIC_API_BASE_URL` must be browser-visible. For local Docker Compose keep `http://localhost:8080`.
 * Do not set `NEXT_PUBLIC_API_BASE_URL` to Docker internal names such as `http://nms-bff:8080` for browser use.
 * Docker Compose reads runtime values from `deploy/.env`.
+
+## Server deployment with existing ThingsBoard stack
+
+For servers that already run:
+
+* `postgres`
+* `tb-core`
+* `nginx`
+
+and expose ThingsBoard on:
+
+* `https://nms.prabutama.my.id`
+
+recommended split is:
+
+* `nms.prabutama.my.id` -> ThingsBoard
+* `dash.prabutama.my.id` -> NMS Dashboard
+
+### Production-facing files
+
+Use these templates:
+
+* `deploy/docker-compose.server-example.yml`
+* `deploy/server.env.example`
+* `deploy/nginx/dashboard.conf.example`
+
+### Production env guidance
+
+`nms-bff` should talk to ThingsBoard over internal Docker networking, not through the public domain:
+
+```env
+THINGSBOARD_BASE_URL=http://tb-core:8080
+```
+
+`nms-web` should use same-origin API routing through nginx:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=/api
+```
+
+### Recommended production routing
+
+* `https://dash.prabutama.my.id/` -> `nms-web:3000`
+* `https://dash.prabutama.my.id/api/` -> `nms-bff:8080`
+
+### Suggested rollout
+
+1. Create DNS for `dash.prabutama.my.id`
+2. Ensure TLS certificate covers `dash.prabutama.my.id`
+3. Copy `deploy/server.env.example` to your server-side env file and fill secrets
+4. Add `deploy/nginx/dashboard.conf.example` as a real nginx vhost
+5. Deploy `nms-bff` and `nms-web` with `deploy/docker-compose.server-example.yml`
+6. Validate dashboard login, sites, devices, alarms, and customer scoping
 * `THINGSBOARD_API_KEY` stays runtime-only and is not baked into images.
 
 ### Example `deploy/.env`
