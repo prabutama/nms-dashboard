@@ -23,7 +23,7 @@ export function DevicesDashboard() {
     <DashboardShell title="Devices" subtitle="All monitored devices discovered from site relations.">
       <section className="grid gap-4 md:grid-cols-3">
         <StatCard title="Devices" value={summaryQuery.data?.summary.deviceCount ?? devices.length} note="Total network devices" />
-        <StatCard title="Online" value={summaryQuery.data?.summary.onlineDeviceCount ?? 0} note="Reachable with fresh telemetry" status="normal" />
+        <StatCard title="Online" value={summaryQuery.data?.summary.onlineDeviceCount ?? 0} note="Reachability based" status="normal" />
         <StatCard title="Stale" value={summaryQuery.data?.summary.staleDeviceCount ?? 0} note="Telemetry older than 5 min" status={summaryQuery.data?.summary.staleDeviceCount ? "warning" : "normal"} />
       </section>
 

@@ -6,10 +6,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go build -o /bin/nms-bff ./cmd/api
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /bin/nms-bff ./cmd/api
 
 FROM alpine:3.20
 
+RUN apk add --no-cache ca-certificates
 RUN adduser -D -H -u 10001 appuser
 USER appuser
 

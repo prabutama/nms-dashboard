@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -30,6 +31,7 @@ type apiServer struct {
 	cfg    config.Config
 	logger *slog.Logger
 	tb     *thingsboard.Client
+	cache  *memoryCache
 }
 
 type integrationStatusResponse struct {
@@ -178,7 +180,7 @@ type metricCatalogEntry struct {
 }
 
 func newAPIServer(cfg config.Config, logger *slog.Logger) *apiServer {
-	server := &apiServer{cfg: cfg, logger: logger}
+	server := &apiServer{cfg: cfg, logger: logger, cache: newMemoryCache(cfg.CacheTTLSeconds)}
 
 	if cfg.HasThingsBoardSetup {
 		client, err := thingsboard.NewClient(thingsboard.Config{
@@ -207,21 +209,21 @@ func (s *apiServer) registerRoutes(r chi.Router) {
 			r.Use(s.requireTBAuth())
 			r.Get("/auth/me", s.authMeHandler())
 			r.Post("/auth/logout", s.authLogoutHandler())
-			r.Get("/alarms", s.alarmsHandler())
-			r.Get("/sites", s.sitesHandler())
-			r.Get("/sites/{siteKey}/devices", s.siteDevicesHandler())
+			r.With(s.cacheGetResponse(30*time.Second)).Get("/alarms", s.alarmsHandler())
+			r.With(s.cacheGetResponse(60*time.Second)).Get("/sites", s.sitesHandler())
+			r.With(s.cacheGetResponse(30*time.Second)).Get("/sites/{siteKey}/devices", s.siteDevicesHandler())
 			r.Get("/sites/{siteKey}/alarms", s.siteAlarmsHandler())
-			r.Get("/sites/{siteKey}/topology", s.siteTopologyHandler())
+			r.With(s.cacheGetResponse(60*time.Second)).Get("/sites/{siteKey}/topology", s.siteTopologyHandler())
 			r.Get("/devices/{deviceId}", s.deviceDetailHandler())
 			r.Get("/devices/{deviceId}/telemetry/latest", s.latestTelemetryHandler())
 			r.Get("/devices/{deviceId}/telemetry/history", s.telemetryHistoryHandler())
 			r.Get("/devices/{deviceId}/summary", s.deviceSummaryHandler())
-			r.Get("/devices/{deviceId}/dashboard", s.deviceDashboardHandler())
+			r.With(s.cacheGetResponse(15*time.Second)).Get("/devices/{deviceId}/dashboard", s.deviceDashboardHandler())
 			r.Get("/devices/{deviceId}/alarms", s.deviceAlarmsHandler())
 			r.Get("/assets/{assetId}/attributes", s.assetAttributesHandler())
-			r.Get("/reports/summary", s.reportsSummaryHandler())
-			r.Get("/reports/sites", s.reportsSitesHandler())
-			r.Get("/reports/devices", s.reportsDevicesHandler())
+			r.With(s.cacheGetResponse(30*time.Second)).Get("/reports/summary", s.reportsSummaryHandler())
+			r.With(s.cacheGetResponse(30*time.Second)).Get("/reports/sites", s.reportsSitesHandler())
+			r.With(s.cacheGetResponse(30*time.Second)).Get("/reports/devices", s.reportsDevicesHandler())
 			r.With(s.requireAuthority("TENANT_ADMIN", "SYS_ADMIN")).Get("/devices/{deviceId}/attributes", s.deviceAttributesHandler())
 			r.With(s.requireAuthority("TENANT_ADMIN", "SYS_ADMIN")).Post("/alarms/{alarmId}/ack", s.alarmAckHandler())
 			r.With(s.requireAuthority("TENANT_ADMIN", "SYS_ADMIN")).Post("/alarms/{alarmId}/clear", s.alarmClearHandler())
@@ -1399,6 +1401,264 @@ type deviceIssueInfo struct {
 	updatedAt  string
 }
 
+type reportsSnapshot struct {
+	rangeLabel         string
+	reportRange        nms.ReportRange
+	sites              []nms.Site
+	summary            nms.ReportSummaryKPI
+	topSitesByAlarms   []nms.ReportSiteRow
+	topDevicesByIssues []nms.ReportDeviceRow
+	allDevices         []nms.ReportDeviceRow
+	generatedAt        string
+}
+
+type deviceTelemetrySnapshot struct {
+	telemetry []thingsboard.TelemetryValue
+	err       error
+}
+
+func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (*reportsSnapshot, error) {
+	rangeLabel, startMs, endMs := parseReportRange(r)
+	sites, err := s.loadSites(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("load sites: %w", err)
+	}
+
+	alarmQuery := thingsboard.AlarmQuery{
+		Page:         0,
+		PageSize:     200,
+		StartTime:    startMs,
+		EndTime:      endMs,
+		SortProperty: "createdTime",
+		SortOrder:    "DESC",
+	}
+	alarmPage, alarmErr := s.tbListAlarms(ctx, alarmQuery)
+	activeAlarmCount := 0
+	criticalAlarmCount := 0
+	alarmsByDevice := make(map[string][]thingsboard.AlarmInfo)
+	if alarmErr == nil {
+		for _, alarm := range alarmPage.Items {
+			if alarm.Status == "ACTIVE_UNACK" || alarm.Status == "ACTIVE_ACK" {
+				activeAlarmCount++
+				if alarm.Severity == "CRITICAL" || alarm.Severity == "MAJOR" {
+					criticalAlarmCount++
+				}
+			}
+			if alarm.Originator.EntityType == "DEVICE" {
+				alarmsByDevice[alarm.Originator.ID] = append(alarmsByDevice[alarm.Originator.ID], alarm)
+			}
+		}
+	}
+
+	totalDeviceCount := 0
+	onlineCount := 0
+	staleCount := 0
+	siteRows := make([]nms.ReportSiteRow, 0, len(sites))
+	deviceIssues := make([]deviceIssueInfo, 0)
+	deviceRows := make([]nms.ReportDeviceRow, 0)
+	now := time.Now().UTC()
+
+	for _, site := range sites {
+		devices, err := s.loadSiteDevices(ctx, site)
+		if err != nil {
+			s.logger.Warn("reports: load site devices failed", "siteKey", site.SiteKey, "error", err)
+			continue
+		}
+
+		siteDeviceCount := len(devices)
+		totalDeviceCount += siteDeviceCount
+		siteOnlineCount := 0
+		siteStaleCount := 0
+		siteAlarmCount := 0
+		siteCriticalCount := 0
+		telemetryByDevice := s.loadLatestTelemetryBatch(ctx, devices)
+
+		for _, device := range devices {
+			deviceAlarms := alarmsByDevice[device.DeviceID]
+			alarmCount := len(deviceAlarms)
+			siteAlarmCount += alarmCount
+
+			for _, a := range deviceAlarms {
+				if a.Severity == "CRITICAL" || a.Severity == "MAJOR" {
+					siteCriticalCount++
+				}
+			}
+
+			telemetryResult, ok := telemetryByDevice[device.DeviceID]
+			if !ok || telemetryResult.err != nil {
+				continue
+			}
+			telemetry := telemetryResult.telemetry
+
+			lastTs := int64(0)
+			hasTelemetry := len(telemetry) > 0
+			telemetryMap := make(map[string]string, len(telemetry))
+			for _, item := range telemetry {
+				telemetryMap[item.Key] = item.Value
+				if item.Timestamp > lastTs {
+					lastTs = item.Timestamp
+				}
+			}
+
+			reachable := hasTelemetry
+			if v, ok := telemetryMap["icmp.reachable"]; ok {
+				val2, _ := parseTelemetryValue(v)
+				reachable = truthy(val2)
+			}
+			freshness := "unknown"
+			if lastTs > 0 {
+				freshness = freshnessForTimestamp(lastTs)
+			}
+			if reachable {
+				siteOnlineCount++
+				onlineCount++
+			}
+			if freshness == "stale" {
+				siteStaleCount++
+				staleCount++
+			}
+
+			avgLatency := parseFloat64(telemetryMap["icmp.latency_ms"])
+			packetLoss := parseFloat64(telemetryMap["icmp.packet_loss_pct"])
+			cpuAvg := parseFloat64(telemetryMap["snmp.host.cpu.load_pct"])
+			memAvg := parseFloat64(telemetryMap["snmp.host.memory.used_pct"])
+
+			health := "unknown"
+			if !reachable && hasTelemetry {
+				health = "critical"
+			} else if hasTelemetry {
+				health = "normal"
+			}
+			if freshness == "stale" && health != "critical" {
+				health = "warning"
+			}
+
+			updatedAt := ""
+			if lastTs > 0 {
+				updatedAt = timestampRFC3339(lastTs)
+			}
+
+			deviceRows = append(deviceRows, nms.ReportDeviceRow{
+				DeviceID:      device.DeviceID,
+				SiteKey:       site.SiteKey,
+				Name:          device.Name,
+				Type:          device.Type,
+				Health:        health,
+				Reachable:     reachable,
+				Freshness:     freshness,
+				AlarmCount:    alarmCount,
+				AvgLatencyMs:  avgLatency,
+				PacketLossPct: packetLoss,
+				CPUAvgPct:     cpuAvg,
+				MemoryAvgPct:  memAvg,
+				UpdatedAt:     updatedAt,
+			})
+
+			issueScore := alarmCount * 10
+			if avgLatency > 100 {
+				issueScore += 5
+			}
+			if avgLatency > 250 {
+				issueScore += 10
+			}
+			if packetLoss > 2 {
+				issueScore += 5
+			}
+			if packetLoss > 5 {
+				issueScore += 10
+			}
+			if cpuAvg > 75 {
+				issueScore += 5
+			}
+			if cpuAvg > 90 {
+				issueScore += 10
+			}
+			if memAvg > 80 {
+				issueScore += 5
+			}
+			if memAvg > 90 {
+				issueScore += 10
+			}
+
+			if issueScore > 0 || alarmCount > 0 {
+				deviceIssues = append(deviceIssues, deviceIssueInfo{deviceID: device.DeviceID, name: device.Name, deviceType: device.Type, siteKey: site.SiteKey, score: issueScore, alarmCount: alarmCount, health: health, reachable: reachable, freshness: freshness, avgLatency: avgLatency, packetLoss: packetLoss, cpuAvg: cpuAvg, memAvg: memAvg, updatedAt: updatedAt})
+			}
+		}
+
+		siteHealth := "normal"
+		if siteCriticalCount > 0 {
+			siteHealth = "critical"
+		} else if siteAlarmCount > 0 {
+			siteHealth = "warning"
+		}
+
+		siteRows = append(siteRows, nms.ReportSiteRow{SiteKey: site.SiteKey, SiteName: site.Name, DeviceCount: siteDeviceCount, OnlineDeviceCount: siteOnlineCount, StaleDeviceCount: siteStaleCount, ActiveAlarmCount: siteAlarmCount, CriticalAlarmCount: siteCriticalCount, Health: siteHealth, LastUpdatedAt: now.Format(time.RFC3339)})
+	}
+
+	sort.Slice(siteRows, func(i, j int) bool { return siteRows[i].ActiveAlarmCount > siteRows[j].ActiveAlarmCount })
+	sort.Slice(deviceIssues, func(i, j int) bool { return deviceIssues[i].score > deviceIssues[j].score })
+	if len(deviceIssues) > 10 {
+		deviceIssues = deviceIssues[:10]
+	}
+	topDevices := make([]nms.ReportDeviceRow, len(deviceIssues))
+	for i, di := range deviceIssues {
+		topDevices[i] = nms.ReportDeviceRow{DeviceID: di.deviceID, SiteKey: di.siteKey, Name: di.name, Type: di.deviceType, Health: di.health, Reachable: di.reachable, Freshness: di.freshness, AlarmCount: di.alarmCount, AvgLatencyMs: di.avgLatency, PacketLossPct: di.packetLoss, CPUAvgPct: di.cpuAvg, MemoryAvgPct: di.memAvg, UpdatedAt: di.updatedAt}
+	}
+	sort.Slice(deviceRows, func(i, j int) bool {
+		if deviceRows[i].AlarmCount != deviceRows[j].AlarmCount {
+			return deviceRows[i].AlarmCount > deviceRows[j].AlarmCount
+		}
+		return deviceRows[i].Name < deviceRows[j].Name
+	})
+
+	endAt := now
+	startAt := endAt.Add(-reportRangeDuration(rangeLabel))
+	return &reportsSnapshot{
+		rangeLabel:         rangeLabel,
+		reportRange:        nms.ReportRange{Label: rangeLabel, StartAt: startAt.Format(time.RFC3339), EndAt: endAt.Format(time.RFC3339)},
+		sites:              sites,
+		summary:            nms.ReportSummaryKPI{SiteCount: len(sites), DeviceCount: totalDeviceCount, OnlineDeviceCount: onlineCount, StaleDeviceCount: staleCount, ActiveAlarmCount: activeAlarmCount, CriticalAlarmCount: criticalAlarmCount},
+		topSitesByAlarms:   siteRows,
+		topDevicesByIssues: topDevices,
+		allDevices:         deviceRows,
+		generatedAt:        now.Format(time.RFC3339),
+	}, nil
+}
+
+func (s *apiServer) loadLatestTelemetryBatch(ctx context.Context, devices []nms.Device) map[string]deviceTelemetrySnapshot {
+	results := make(map[string]deviceTelemetrySnapshot, len(devices))
+	if len(devices) == 0 {
+		return results
+	}
+
+	type telemetryResult struct {
+		deviceID string
+		item     deviceTelemetrySnapshot
+	}
+	sem := make(chan struct{}, 8)
+	resultCh := make(chan telemetryResult, len(devices))
+	var wg sync.WaitGroup
+
+	for _, device := range devices {
+		device := device
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sem <- struct{}{}
+			telemetry, err := s.tbGetLatestTelemetry(ctx, device.DeviceID)
+			<-sem
+			resultCh <- telemetryResult{deviceID: device.DeviceID, item: deviceTelemetrySnapshot{telemetry: telemetry, err: err}}
+		}()
+	}
+
+	wg.Wait()
+	close(resultCh)
+	for result := range resultCh {
+		results[result.deviceID] = result.item
+	}
+	return results
+}
+
 func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if s.tb == nil {
@@ -1409,10 +1669,7 @@ func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 			return
 		}
 
-		ctx := r.Context()
-		rangeLabel, startMs, endMs := parseReportRange(r)
-
-		sites, err := s.loadSites(ctx)
+		snapshot, err := s.buildReportsSnapshot(r.Context(), r)
 		if err != nil {
 			s.logger.Warn("reports: load sites failed", "error", err)
 			writeJSON(w, http.StatusOK, reportSummaryResponse{
@@ -1422,237 +1679,12 @@ func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 			return
 		}
 
-		alarmQuery := thingsboard.AlarmQuery{
-			Page:         0,
-			PageSize:     100,
-			StartTime:    startMs,
-			EndTime:      endMs,
-			SortProperty: "createdTime",
-			SortOrder:    "DESC",
-		}
-		alarmPage, alarmErr := s.tbListAlarms(ctx, alarmQuery)
-
-		activeAlarmCount := 0
-		criticalAlarmCount := 0
-		alarmsByDevice := make(map[string][]thingsboard.AlarmInfo)
-
-		if alarmErr == nil {
-			for _, alarm := range alarmPage.Items {
-				if alarm.Status == "ACTIVE_UNACK" || alarm.Status == "ACTIVE_ACK" {
-					activeAlarmCount++
-					if alarm.Severity == "CRITICAL" || alarm.Severity == "MAJOR" {
-						criticalAlarmCount++
-					}
-				}
-				if alarm.Originator.EntityType == "DEVICE" {
-					alarmsByDevice[alarm.Originator.ID] = append(alarmsByDevice[alarm.Originator.ID], alarm)
-				}
-			}
-		}
-
-		totalDeviceCount := 0
-		onlineCount := 0
-		staleCount := 0
-		siteRows := make([]nms.ReportSiteRow, 0, len(sites))
-		deviceIssues := make([]deviceIssueInfo, 0)
-
-		for _, site := range sites {
-			devices, err := s.loadSiteDevices(ctx, site)
-			if err != nil {
-				s.logger.Warn("reports: load site devices failed", "siteKey", site.SiteKey, "error", err)
-				continue
-			}
-
-			siteDeviceCount := len(devices)
-			totalDeviceCount += siteDeviceCount
-			siteOnlineCount := 0
-			siteStaleCount := 0
-			siteAlarmCount := 0
-			siteCriticalCount := 0
-
-			for _, device := range devices {
-				deviceAlarms := alarmsByDevice[device.DeviceID]
-				alarmCount := len(deviceAlarms)
-				siteAlarmCount += alarmCount
-
-				for _, a := range deviceAlarms {
-					if a.Severity == "CRITICAL" || a.Severity == "MAJOR" {
-						siteCriticalCount++
-					}
-				}
-
-				telemetry, err := s.tbGetLatestTelemetry(ctx, device.DeviceID)
-				if err != nil {
-					continue
-				}
-
-				lastTs := int64(0)
-				hasTelemetry := len(telemetry) > 0
-				for _, item := range telemetry {
-					if item.Timestamp > lastTs {
-						lastTs = item.Timestamp
-					}
-				}
-
-				telemetryMap := make(map[string]string)
-				for _, item := range telemetry {
-					telemetryMap[item.Key] = item.Value
-				}
-
-				reachable := hasTelemetry
-				if v, ok := telemetryMap["icmp.reachable"]; ok {
-					val2, _ := parseTelemetryValue(v)
-					reachable = truthy(val2)
-				}
-				freshness := "unknown"
-				if lastTs > 0 {
-					freshness = freshnessForTimestamp(lastTs)
-				}
-				if reachable && freshness == "fresh" {
-					siteOnlineCount++
-					onlineCount++
-				}
-				if freshness == "stale" {
-					siteStaleCount++
-					staleCount++
-				}
-
-				issueScore := alarmCount * 10
-				avgLatency := parseFloat64(telemetryMap["icmp.latency_ms"])
-				packetLoss := parseFloat64(telemetryMap["icmp.packet_loss_pct"])
-				cpuAvg := parseFloat64(telemetryMap["snmp.host.cpu.load_pct"])
-				memAvg := parseFloat64(telemetryMap["snmp.host.memory.used_pct"])
-
-				if avgLatency > 100 {
-					issueScore += 5
-				}
-				if avgLatency > 250 {
-					issueScore += 10
-				}
-				if packetLoss > 2 {
-					issueScore += 5
-				}
-				if packetLoss > 5 {
-					issueScore += 10
-				}
-				if cpuAvg > 75 {
-					issueScore += 5
-				}
-				if cpuAvg > 90 {
-					issueScore += 10
-				}
-				if memAvg > 80 {
-					issueScore += 5
-				}
-				if memAvg > 90 {
-					issueScore += 10
-				}
-
-				health := "unknown"
-				if !reachable && hasTelemetry {
-					health = "critical"
-				} else if hasTelemetry {
-					health = "normal"
-				}
-				if freshness == "stale" && health != "critical" {
-					health = "warning"
-				}
-
-				if issueScore > 0 || alarmCount > 0 {
-					updatedAt := ""
-					if lastTs > 0 {
-						updatedAt = timestampRFC3339(lastTs)
-					}
-					deviceIssues = append(deviceIssues, deviceIssueInfo{
-						deviceID:   device.DeviceID,
-						name:       device.Name,
-						deviceType: device.Type,
-						siteKey:    site.SiteKey,
-						score:      issueScore,
-						alarmCount: alarmCount,
-						health:     health,
-						reachable:  reachable,
-						freshness:  freshness,
-						avgLatency: avgLatency,
-						packetLoss: packetLoss,
-						cpuAvg:     cpuAvg,
-						memAvg:     memAvg,
-						updatedAt:  updatedAt,
-					})
-				}
-			}
-
-			siteHealth := "normal"
-			if siteCriticalCount > 0 {
-				siteHealth = "critical"
-			} else if siteAlarmCount > 0 {
-				siteHealth = "warning"
-			}
-
-			siteRows = append(siteRows, nms.ReportSiteRow{
-				SiteKey:            site.SiteKey,
-				SiteName:           site.Name,
-				DeviceCount:        siteDeviceCount,
-				OnlineDeviceCount:  siteOnlineCount,
-				StaleDeviceCount:   siteStaleCount,
-				ActiveAlarmCount:   siteAlarmCount,
-				CriticalAlarmCount: siteCriticalCount,
-				Health:             siteHealth,
-				LastUpdatedAt:      time.Now().UTC().Format(time.RFC3339),
-			})
-		}
-
-		sort.Slice(siteRows, func(i, j int) bool {
-			return siteRows[i].ActiveAlarmCount > siteRows[j].ActiveAlarmCount
-		})
-
-		sort.Slice(deviceIssues, func(i, j int) bool {
-			return deviceIssues[i].score > deviceIssues[j].score
-		})
-		if len(deviceIssues) > 10 {
-			deviceIssues = deviceIssues[:10]
-		}
-
-		topDevices := make([]nms.ReportDeviceRow, len(deviceIssues))
-		for i, di := range deviceIssues {
-			topDevices[i] = nms.ReportDeviceRow{
-				DeviceID:      di.deviceID,
-				SiteKey:       di.siteKey,
-				Name:          di.name,
-				Type:          di.deviceType,
-				Health:        di.health,
-				Reachable:     di.reachable,
-				Freshness:     di.freshness,
-				AlarmCount:    di.alarmCount,
-				AvgLatencyMs:  di.avgLatency,
-				PacketLossPct: di.packetLoss,
-				CPUAvgPct:     di.cpuAvg,
-				MemoryAvgPct:  di.memAvg,
-				UpdatedAt:     di.updatedAt,
-			}
-		}
-
-		now := time.Now().UTC()
-		endAt := now
-		startAt := endAt.Add(-reportRangeDuration(rangeLabel))
-
 		writeJSON(w, http.StatusOK, reportSummaryResponse{
-			Range: nms.ReportRange{
-				Label:   rangeLabel,
-				StartAt: startAt.Format(time.RFC3339),
-				EndAt:   endAt.Format(time.RFC3339),
-			},
-			Summary: nms.ReportSummaryKPI{
-				SiteCount:          len(sites),
-				DeviceCount:        totalDeviceCount,
-				OnlineDeviceCount:  onlineCount,
-				StaleDeviceCount:   staleCount,
-				ActiveAlarmCount:   activeAlarmCount,
-				CriticalAlarmCount: criticalAlarmCount,
-			},
-			TopSitesByAlarms:   siteRows,
-			TopDevicesByIssues: topDevices,
-			GeneratedAt:        now.Format(time.RFC3339),
+			Range:              snapshot.reportRange,
+			Summary:            snapshot.summary,
+			TopSitesByAlarms:   snapshot.topSitesByAlarms,
+			TopDevicesByIssues: snapshot.topDevicesByIssues,
+			GeneratedAt:        snapshot.generatedAt,
 			Source:             "thingsboard",
 			Message:            "Report summary generated",
 		})
@@ -1670,10 +1702,7 @@ func (s *apiServer) reportsSitesHandler() http.HandlerFunc {
 			return
 		}
 
-		ctx := r.Context()
-		rangeLabel, startMs, endMs := parseReportRange(r)
-
-		sites, err := s.loadSites(ctx)
+		snapshot, err := s.buildReportsSnapshot(r.Context(), r)
 		if err != nil {
 			s.logger.Warn("reports: load sites failed", "error", err)
 			writeJSON(w, http.StatusOK, reportSitesListResponse{
@@ -1684,103 +1713,9 @@ func (s *apiServer) reportsSitesHandler() http.HandlerFunc {
 			return
 		}
 
-		alarmQuery := thingsboard.AlarmQuery{
-			Page:         0,
-			PageSize:     100,
-			StartTime:    startMs,
-			EndTime:      endMs,
-			SortProperty: "createdTime",
-			SortOrder:    "DESC",
-		}
-		alarmPage, alarmErr := s.tbListAlarms(ctx, alarmQuery)
-
-		alarmsByDevice := make(map[string][]thingsboard.AlarmInfo)
-		if alarmErr == nil {
-			for _, alarm := range alarmPage.Items {
-				if alarm.Originator.EntityType == "DEVICE" {
-					alarmsByDevice[alarm.Originator.ID] = append(alarmsByDevice[alarm.Originator.ID], alarm)
-				}
-			}
-		}
-
-		items := make([]nms.ReportSiteRow, 0, len(sites))
-		for _, site := range sites {
-			devices, err := s.loadSiteDevices(ctx, site)
-			if err != nil {
-				continue
-			}
-
-			siteDeviceCount := len(devices)
-			siteOnlineCount := 0
-			siteStaleCount := 0
-			siteAlarmCount := 0
-			siteCriticalCount := 0
-
-			for _, device := range devices {
-				deviceAlarms := alarmsByDevice[device.DeviceID]
-				alarmCount := len(deviceAlarms)
-				siteAlarmCount += alarmCount
-
-				for _, a := range deviceAlarms {
-					if a.Severity == "CRITICAL" || a.Severity == "MAJOR" {
-						siteCriticalCount++
-					}
-				}
-
-				telemetry, err := s.tbGetLatestTelemetry(ctx, device.DeviceID)
-				if err != nil {
-					continue
-				}
-
-				lastTs := int64(0)
-				for _, t := range telemetry {
-					if t.Timestamp > lastTs {
-						lastTs = t.Timestamp
-					}
-				}
-				freshness := "unknown"
-				if lastTs > 0 {
-					freshness = freshnessForTimestamp(lastTs)
-				}
-				if len(telemetry) > 0 && freshness == "fresh" {
-					siteOnlineCount++
-				}
-				if freshness == "stale" {
-					siteStaleCount++
-				}
-			}
-
-			siteHealth := "normal"
-			if siteCriticalCount > 0 {
-				siteHealth = "critical"
-			} else if siteAlarmCount > 0 {
-				siteHealth = "warning"
-			}
-
-			items = append(items, nms.ReportSiteRow{
-				SiteKey:            site.SiteKey,
-				SiteName:           site.Name,
-				DeviceCount:        siteDeviceCount,
-				OnlineDeviceCount:  siteOnlineCount,
-				StaleDeviceCount:   siteStaleCount,
-				ActiveAlarmCount:   siteAlarmCount,
-				CriticalAlarmCount: siteCriticalCount,
-				Health:             siteHealth,
-				LastUpdatedAt:      time.Now().UTC().Format(time.RFC3339),
-			})
-		}
-
-		now := time.Now().UTC()
-		endAt := now
-		startAt := endAt.Add(-reportRangeDuration(rangeLabel))
-
 		writeJSON(w, http.StatusOK, reportSitesListResponse{
-			Range: nms.ReportRange{
-				Label:   rangeLabel,
-				StartAt: startAt.Format(time.RFC3339),
-				EndAt:   endAt.Format(time.RFC3339),
-			},
-			Items:   items,
+			Range:   snapshot.reportRange,
+			Items:   snapshot.topSitesByAlarms,
 			Source:  "thingsboard",
 			Message: "Site report generated",
 		})
@@ -1798,11 +1733,8 @@ func (s *apiServer) reportsDevicesHandler() http.HandlerFunc {
 			return
 		}
 
-		ctx := r.Context()
-		rangeLabel, startMs, endMs := parseReportRange(r)
 		siteFilter := strings.TrimSpace(r.URL.Query().Get("siteKey"))
-
-		sites, err := s.loadSites(ctx)
+		snapshot, err := s.buildReportsSnapshot(r.Context(), r)
 		if err != nil {
 			s.logger.Warn("reports: load sites for devices failed", "error", err)
 			writeJSON(w, http.StatusOK, reportDevicesListResponse{
@@ -1813,114 +1745,16 @@ func (s *apiServer) reportsDevicesHandler() http.HandlerFunc {
 			return
 		}
 
-		alarmQuery := thingsboard.AlarmQuery{
-			Page:         0,
-			PageSize:     200,
-			StartTime:    startMs,
-			EndTime:      endMs,
-			SortProperty: "createdTime",
-			SortOrder:    "DESC",
-		}
-		alarmPage, alarmErr := s.tbListAlarms(ctx, alarmQuery)
-		alarmsByDevice := make(map[string][]thingsboard.AlarmInfo)
-		if alarmErr == nil {
-			for _, alarm := range alarmPage.Items {
-				if alarm.Originator.EntityType == "DEVICE" {
-					alarmsByDevice[alarm.Originator.ID] = append(alarmsByDevice[alarm.Originator.ID], alarm)
-				}
-			}
-		}
-
-		items := make([]nms.ReportDeviceRow, 0)
-		for _, site := range sites {
-			if siteFilter != "" && site.SiteKey != siteFilter {
+		items := make([]nms.ReportDeviceRow, 0, len(snapshot.allDevices))
+		for _, item := range snapshot.allDevices {
+			if siteFilter != "" && item.SiteKey != siteFilter {
 				continue
 			}
-
-			devices, err := s.loadSiteDevices(ctx, site)
-			if err != nil {
-				continue
-			}
-
-			for _, device := range devices {
-				deviceAlarms := alarmsByDevice[device.DeviceID]
-				alarmCount := len(deviceAlarms)
-
-				telemetry, err := s.tbGetLatestTelemetry(ctx, device.DeviceID)
-				if err != nil {
-					continue
-				}
-
-				lastTs := int64(0)
-				hasTelemetry := len(telemetry) > 0
-				telemetryMap := make(map[string]string)
-				for _, item := range telemetry {
-					telemetryMap[item.Key] = item.Value
-					if item.Timestamp > lastTs {
-						lastTs = item.Timestamp
-					}
-				}
-
-				reachable := hasTelemetry
-				if v, ok := telemetryMap["icmp.reachable"]; ok {
-					val2, _ := parseTelemetryValue(v)
-					reachable = truthy(val2)
-				}
-				freshness := "unknown"
-				if lastTs > 0 {
-					freshness = freshnessForTimestamp(lastTs)
-				}
-
-				health := "unknown"
-				if !reachable && hasTelemetry {
-					health = "critical"
-				} else if hasTelemetry {
-					health = "normal"
-				}
-				if freshness == "stale" && health != "critical" {
-					health = "warning"
-				}
-
-				updatedAt := ""
-				if lastTs > 0 {
-					updatedAt = timestampRFC3339(lastTs)
-				}
-
-				items = append(items, nms.ReportDeviceRow{
-					DeviceID:      device.DeviceID,
-					SiteKey:       site.SiteKey,
-					Name:          device.Name,
-					Type:          device.Type,
-					Health:        health,
-					Reachable:     reachable,
-					Freshness:     freshness,
-					AlarmCount:    alarmCount,
-					AvgLatencyMs:  parseFloat64(telemetryMap["icmp.latency_ms"]),
-					PacketLossPct: parseFloat64(telemetryMap["icmp.packet_loss_pct"]),
-					CPUAvgPct:     parseFloat64(telemetryMap["snmp.host.cpu.load_pct"]),
-					MemoryAvgPct:  parseFloat64(telemetryMap["snmp.host.memory.used_pct"]),
-					UpdatedAt:     updatedAt,
-				})
-			}
+			items = append(items, item)
 		}
-
-		sort.Slice(items, func(i, j int) bool {
-			if items[i].AlarmCount != items[j].AlarmCount {
-				return items[i].AlarmCount > items[j].AlarmCount
-			}
-			return items[i].Name < items[j].Name
-		})
-
-		now := time.Now().UTC()
-		endAt := now
-		startAt := endAt.Add(-reportRangeDuration(rangeLabel))
 
 		writeJSON(w, http.StatusOK, reportDevicesListResponse{
-			Range: nms.ReportRange{
-				Label:   rangeLabel,
-				StartAt: startAt.Format(time.RFC3339),
-				EndAt:   endAt.Format(time.RFC3339),
-			},
+			Range:   snapshot.reportRange,
 			Items:   items,
 			Source:  "thingsboard",
 			Message: "Device report generated",

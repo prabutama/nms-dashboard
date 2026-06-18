@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/components/auth-provider";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { DeviceLink, StatCard, StatusBadge } from "@/components/nms-ui";
-import { fetchAttributes, fetchSiteAlarms, fetchSiteDevices, fetchSites, fetchSiteTopology } from "@/lib/api";
+import { fetchAttributes, fetchReportDevices, fetchSiteAlarms, fetchSiteDevices, fetchSites, fetchSiteTopology } from "@/lib/api";
 
 function tsDisplay(ts?: string) {
   if (!ts) return "-";
@@ -18,6 +18,7 @@ export function SiteDetailDashboard({ siteKey }: { siteKey: string }) {
   const canReadDebug = user?.authority === "TENANT_ADMIN" || user?.authority === "SYS_ADMIN";
   const sitesQuery = useQuery({ queryKey: ["sites"], queryFn: fetchSites, refetchInterval: 60_000 });
   const devicesQuery = useQuery({ queryKey: ["site-devices", siteKey], queryFn: () => fetchSiteDevices(siteKey), refetchInterval: 60_000 });
+  const reportDevicesQuery = useQuery({ queryKey: ["report-devices", "24h", siteKey], queryFn: () => fetchReportDevices("24h", siteKey), refetchInterval: 60_000 });
   const site = sitesQuery.data?.items.find((item) => item.siteKey === siteKey);
   const attributesQuery = useQuery({
     queryKey: ["site-attributes", site?.assetId],
@@ -44,6 +45,8 @@ export function SiteDetailDashboard({ siteKey }: { siteKey: string }) {
 
   const activeAlarmCount = alarmsQuery.data?.totalElements ?? 0;
   const alarmBadge = activeAlarmCount > 0 ? (siteAlarms.some((a) => a.severity === "CRITICAL" || a.severity === "MAJOR") ? "critical" : "warning") : "normal";
+
+  const deviceHealthByID = new Map((reportDevicesQuery.data?.items || []).map((device) => [device.deviceId, device.health]));
 
   return (
     <DashboardShell title={site?.name || siteKey} subtitle="Site-level summary, device list, and operational status.">
@@ -72,7 +75,7 @@ export function SiteDetailDashboard({ siteKey }: { siteKey: string }) {
         {devicesQuery.error ? <p className="px-4 py-5 text-xs text-red-600">{devicesQuery.error.message}</p> : null}
         {devicesQuery.data?.items.length === 0 ? <p className="border-b border-slate-100 px-4 py-5 text-xs text-slate-500">No devices found for this site.</p> : null}
         {devicesQuery.data?.items.map((device) => (
-          <DeviceLink key={device.deviceId} href={`/devices/${device.deviceId}?site=${siteKey}`} name={device.label || device.name} type={device.type} status="unknown" />
+          <DeviceLink key={device.deviceId} href={`/devices/${device.deviceId}?site=${siteKey}`} name={device.label || device.name} type={device.type} status={deviceHealthByID.get(device.deviceId) || "unknown"} />
         ))}
       </div>
 

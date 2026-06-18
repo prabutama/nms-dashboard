@@ -164,12 +164,38 @@ docker compose -f deploy/docker-compose.yml config
 ## Docker Compose
 
 ```bash
+cd deploy
+cp .env.example .env
+```
+
+Fill `.env` with your real ThingsBoard values, then run:
+
+```bash
 docker compose -f deploy/docker-compose.yml up --build
 ```
 
 Frontend: `http://localhost:3000`
 
 BFF: `http://localhost:8080`
+
+## Container notes
+
+* `NEXT_PUBLIC_API_BASE_URL` must be browser-visible. For local Docker Compose keep `http://localhost:8080`.
+* Do not set `NEXT_PUBLIC_API_BASE_URL` to Docker internal names such as `http://nms-bff:8080` for browser use.
+* Docker Compose reads runtime values from `deploy/.env`.
+* `THINGSBOARD_API_KEY` stays runtime-only and is not baked into images.
+
+### Example `deploy/.env`
+
+```env
+PORT=8080
+THINGSBOARD_BASE_URL=https://your-thingsboard-domain
+THINGSBOARD_API_KEY=your-thingsboard-token
+THINGSBOARD_SITE_ASSET_TYPE=site
+CACHE_TTL_SECONDS=30
+CORS_ALLOWED_ORIGINS=http://localhost:3000
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+```
 
 ## Phase 3 behavior
 

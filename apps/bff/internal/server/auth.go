@@ -31,11 +31,13 @@ func (s *apiServer) authLoginHandler() http.HandlerFunc {
 			return
 		}
 
+		observeTBCall(r.Context())
 		login, err := s.tb.Login(r.Context(), req.Username, req.Password)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, err.Error())
 			return
 		}
+		observeTBCall(r.Context())
 		user, err := s.tb.GetCurrentUser(r.Context(), login.Token)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err.Error())
@@ -69,11 +71,13 @@ func (s *apiServer) authRefreshHandler() http.HandlerFunc {
 			return
 		}
 
+		observeTBCall(r.Context())
 		login, err := s.tb.RefreshToken(r.Context(), req.RefreshToken)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, err.Error())
 			return
 		}
+		observeTBCall(r.Context())
 		user, err := s.tb.GetCurrentUser(r.Context(), login.Token)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err.Error())
@@ -112,6 +116,7 @@ func (s *apiServer) authLogoutHandler() http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "authentication required")
 			return
 		}
+		observeTBCall(r.Context())
 		if err := s.tb.Logout(r.Context(), bearerToken); err != nil {
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
@@ -132,10 +137,18 @@ func (s *apiServer) requireTBAuth() func(http.Handler) http.Handler {
 				writeError(w, http.StatusUnauthorized, "authentication required")
 				return
 			}
-			user, err := s.tb.GetCurrentUser(r.Context(), bearerToken)
-			if err != nil {
-				writeError(w, http.StatusUnauthorized, err.Error())
-				return
+			var user thingsboard.UserInfo
+			if cached, ok := s.cache.getAuthUser(bearerToken); ok {
+				user = cached
+			} else {
+				observeTBCall(r.Context())
+				fetched, err := s.tb.GetCurrentUser(r.Context(), bearerToken)
+				if err != nil {
+					writeError(w, http.StatusUnauthorized, err.Error())
+					return
+				}
+				user = fetched
+				s.cache.setAuthUser(bearerToken, user)
 			}
 			ctx := context.WithValue(r.Context(), authUserContextKey, user)
 			ctx = context.WithValue(ctx, authTokenContextKey, bearerToken)

@@ -6,7 +6,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 
 import { DashboardShell } from "@/components/dashboard-shell";
 import { DeviceLink, StatCard, StatusBadge } from "@/components/nms-ui";
-import { fetchAlarms, fetchAttributes, fetchDeviceDashboard, fetchReportSites, fetchReportSummary, fetchSiteDevices, fetchSites } from "@/lib/api";
+import { fetchAlarms, fetchAttributes, fetchReportSites, fetchReportSummary, fetchSites } from "@/lib/api";
 
 const SiteMapPanel = dynamic(() => import("@/components/site-map-panel").then((mod) => mod.SiteMapPanel), {
   ssr: false,
@@ -34,14 +34,6 @@ export function OverviewDashboard() {
     queryFn: () => fetchReportSites("24h"),
     refetchInterval: 60_000,
   });
-  const siteDeviceQueries = useQueries({
-    queries: (sitesQuery.data?.items || []).map((site) => ({
-      queryKey: ["site-devices", site.siteKey],
-      queryFn: () => fetchSiteDevices(site.siteKey),
-      enabled: sitesQuery.data !== undefined,
-      refetchInterval: 60_000,
-    })),
-  });
   const siteAttributeQueries = useQueries({
     queries: (sitesQuery.data?.items || []).map((site) => ({
       queryKey: ["site-attributes", site.assetId],
@@ -50,17 +42,8 @@ export function OverviewDashboard() {
       refetchInterval: 60_000,
     })),
   });
-  const devices = siteDeviceQueries.flatMap((query) => query.data?.items || []);
-  const sampledDevices = devices.slice(0, 6);
-  const dashboardQueries = useQueries({
-    queries: sampledDevices.map((device) => ({
-      queryKey: ["device-dashboard", device.deviceId],
-      queryFn: () => fetchDeviceDashboard(device.deviceId),
-      enabled: sampledDevices.length > 0,
-    })),
-  });
-  const dashboards = dashboardQueries.map((query) => query.data).filter(Boolean);
-  const criticalDevices = dashboards.filter((dashboard) => dashboard?.health.status === "critical");
+  const topIssueDevices = summaryQuery.data?.topDevicesByIssues || [];
+  const criticalDevices = topIssueDevices.filter((device) => device.health === "critical").slice(0, 6);
   const staleCount = summaryQuery.data?.summary.staleDeviceCount ?? 0;
 
   const activeAlarmCount = activeAlarmsQuery.data?.totalElements ?? 0;
@@ -77,8 +60,8 @@ export function OverviewDashboard() {
 
       <div className="grid gap-4 md:grid-cols-5">
         <StatCard title="Sites" value={sitesQuery.data?.items.length || 0} note="ThingsBoard assets" />
-        <StatCard title="Devices" value={summaryQuery.data?.summary.deviceCount ?? devices.length} note="Total network devices" />
-        <StatCard title="Online" value={summaryQuery.data?.summary.onlineDeviceCount ?? 0} note="Reachable with fresh telemetry" status="normal" />
+        <StatCard title="Devices" value={summaryQuery.data?.summary.deviceCount ?? 0} note="Total network devices" />
+        <StatCard title="Online" value={summaryQuery.data?.summary.onlineDeviceCount ?? 0} note="Reachability based" status="normal" />
         <StatCard title="Active Alarms" value={activeAlarmCount} note={`${alarmCriticalCount} critical/major`} status={activeAlarmCount > 0 ? "warning" : "normal"} />
         <StatCard title="Critical Devices" value={criticalDevices.length} note="From sampled dashboards" status={criticalDevices.length > 0 ? "critical" : "normal"} />
       </div>
@@ -88,15 +71,15 @@ export function OverviewDashboard() {
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
             <div>
               <p className="text-xs font-semibold text-slate-700">Critical & Warning Devices</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Sampled from dashboard endpoints.</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">Derived from aggregated device reports.</p>
             </div>
             <Link href="/devices" className="bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-blue-700">View devices</Link>
           </div>
-          {dashboardQueries.some((query) => query.isLoading) ? <p className="px-4 py-5 text-xs text-slate-500">Loading device health...</p> : null}
+          {summaryQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-500">Loading device health...</p> : null}
           {criticalDevices.length === 0 ? <p className="border-b border-slate-100 px-4 py-5 text-xs text-slate-500">No critical devices among the sampled set.</p> : null}
-          {criticalDevices.map((dashboard) => dashboard ? (
-            <DeviceLink key={dashboard.device.deviceId} href={`/devices/${dashboard.device.deviceId}`} name={dashboard.device.label || dashboard.device.name} type={dashboard.device.type} status={dashboard.health.status} />
-          ) : null)}
+          {criticalDevices.map((device) => (
+            <DeviceLink key={device.deviceId} href={`/devices/${device.deviceId}${device.siteKey ? `?site=${device.siteKey}` : ""}`} name={device.name} type={device.type} status={device.health} />
+          ))}
         </div>
 
         <div className="border border-slate-200 bg-white">
