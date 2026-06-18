@@ -1,21 +1,22 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Poppins } from "next/font/google";
+import "leaflet/dist/leaflet.css";
 
 import "./globals.css";
 
 import { QueryProvider } from "@/components/query-provider";
 
-const inter = Inter({ subsets: ["latin"] });
+const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
   title: "NMS Dashboard",
-  description: "Custom NMS dashboard platform skeleton for ThingsBoard-backed operations.",
+  description: "Professional NMS dashboard for ThingsBoard-backed operations.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={poppins.className}>
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

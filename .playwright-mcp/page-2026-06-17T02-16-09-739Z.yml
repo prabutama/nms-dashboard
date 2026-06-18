@@ -1,0 +1,132 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - complementary [ref=e4]:
+        - link "NMS Dashboard Operations Console" [ref=e5] [cursor=pointer]:
+          - /url: /
+          - img [ref=e7]
+          - generic [ref=e9]:
+            - paragraph [ref=e10]: NMS Dashboard
+            - paragraph [ref=e11]: Operations Console
+        - navigation [ref=e12]:
+          - link "Overview" [ref=e13] [cursor=pointer]:
+            - /url: /
+            - img [ref=e14]
+            - text: Overview
+          - link "Sites" [ref=e17] [cursor=pointer]:
+            - /url: /sites
+            - img [ref=e18]
+            - text: Sites
+          - link "Devices" [ref=e20] [cursor=pointer]:
+            - /url: /devices
+            - img [ref=e21]
+            - text: Devices
+          - link "Alarms" [ref=e24] [cursor=pointer]:
+            - /url: /alarms
+            - img [ref=e25]
+            - text: Alarms
+          - link "Reports" [ref=e28] [cursor=pointer]:
+            - /url: /reports
+            - img [ref=e29]
+            - text: Reports
+          - link "Settings" [ref=e32] [cursor=pointer]:
+            - /url: /settings
+            - img [ref=e33]
+            - text: Settings
+        - generic [ref=e36]:
+          - paragraph [ref=e37]: BFF protected boundary
+          - paragraph [ref=e38]: Frontend reads normalized NMS data only. ThingsBoard credentials stay server-side.
+      - generic [ref=e40]:
+        - generic [ref=e41]:
+          - paragraph [ref=e42]: Monitoring
+          - heading "Branch-B — Logical Topology" [level=1] [ref=e74]
+          - paragraph [ref=e44]: Inferred from IPv4 route and subnet data. Not LLDP/CDP physical cabling.
+        - generic [ref=e45]:
+          - link "Sites" [ref=e46] [cursor=pointer]:
+            - /url: /sites
+          - generic [ref=e47]: /
+          - link "Branch-B" [ref=e75] [cursor=pointer]:
+            - /url: /sites/branch-b
+          - generic [ref=e49]: /
+          - generic [ref=e50]: Topology
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - generic [ref=e53]:
+              - generic [ref=e54]:
+                - heading "Branch-B — Logical Topology" [level=2] [ref=e76]
+                - generic [ref=e56]: Healthy
+              - paragraph [ref=e57]: Inferred from IPv4 route and subnet data.
+              - paragraph [ref=e58]: Logical inference only. Not LLDP/CDP physical cabling.
+            - generic [ref=e77]:
+              - generic "6/16/2026, 10:15:47 PM" [ref=e78]: Generated 10h ago
+              - generic [ref=e79]: "#abb7f7ba"
+          - generic [ref=e59]:
+            - generic [ref=e60]:
+              - paragraph [ref=e61]: Devices
+              - paragraph [ref=e62]: "3"
+            - generic [ref=e63]:
+              - paragraph [ref=e64]: Subnets
+              - paragraph [ref=e65]: "2"
+            - generic [ref=e66]:
+              - paragraph [ref=e67]: Edges
+              - paragraph [ref=e68]: "7"
+            - generic [ref=e69]:
+              - paragraph [ref=e70]: External
+              - paragraph [ref=e71]: "1"
+        - generic [ref=e80]:
+          - generic [ref=e81]:
+            - img [ref=e82]:
+              - generic [ref=e85]: EXTERNAL
+              - generic [ref=e88]: GATEWAY
+              - generic [ref=e91]: NETWORK
+              - generic [ref=e94]: ENDPOINT
+              - generic [ref=e97]: Next hop
+              - generic [ref=e102]: Next hop
+              - generic [ref=e109]:
+                - generic [ref=e111]: 10.10.10.1
+                - generic [ref=e112]: External Gateway
+              - generic [ref=e113]:
+                - generic [ref=e115]: mikrotik-br-b-router
+                - generic [ref=e116]: Router / Gateway
+              - generic [ref=e117]:
+                - generic [ref=e119]: 10.10.10.0/24
+                - generic [ref=e120]: Subnet
+              - generic [ref=e121]:
+                - generic [ref=e123]: 172.16.30.0/24
+                - generic [ref=e124]: Subnet
+              - generic [ref=e125]:
+                - generic [ref=e127]: linux-br-b-server
+                - generic [ref=e128]: Server
+              - generic [ref=e129]:
+                - generic [ref=e131]: linux-br-b-server-2
+                - generic [ref=e132]: Server
+            - generic [ref=e133]:
+              - paragraph [ref=e134]: Legend
+              - generic [ref=e135]:
+                - generic [ref=e136]:
+                  - img [ref=e137]
+                  - generic [ref=e139]: Router / Gateway
+                - generic [ref=e140]:
+                  - img [ref=e141]
+                  - generic [ref=e143]: Server / Endpoint
+                - generic [ref=e144]:
+                  - img [ref=e145]
+                  - generic [ref=e147]: Subnet / LAN
+                - generic [ref=e148]:
+                  - img [ref=e149]
+                  - generic [ref=e151]: External Gateway
+              - generic [ref=e152]:
+                - generic [ref=e155]: Connected Subnet
+                - generic [ref=e158]: Default Route
+                - generic [ref=e161]: Next Hop
+            - generic [ref=e162]:
+              - button "+" [ref=e163] [cursor=pointer]
+              - button "−" [ref=e164] [cursor=pointer]
+              - button "⊡" [active] [ref=e165] [cursor=pointer]
+              - button "🔓" [ref=e166] [cursor=pointer]
+              - generic [ref=e167]: 114%
+            - img [ref=e169]
+            - generic [ref=e183]: Drag to pan · Scroll to zoom
+          - group [ref=e184]:
+            - generic "Raw edges table" [ref=e185] [cursor=pointer]
+  - alert [ref=e73]

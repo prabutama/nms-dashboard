@@ -10,6 +10,7 @@ services:
       THINGSBOARD_API_KEY: ""
       THINGSBOARD_SITE_ASSET_TYPE: "site"
       CACHE_TTL_SECONDS: "30"
+      CORS_ALLOWED_ORIGINS: "http://localhost:3000"
     ports:
       - "8080:8080"
 

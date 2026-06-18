@@ -1,0 +1,52 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - link "NMS Dashboard Operations Console" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img [ref=e7]
+        - generic [ref=e9]:
+          - paragraph [ref=e10]: NMS Dashboard
+          - paragraph [ref=e11]: Operations Console
+      - navigation [ref=e12]:
+        - link "Overview" [ref=e13] [cursor=pointer]:
+          - /url: /
+          - img [ref=e14]
+          - text: Overview
+        - link "Sites" [ref=e17] [cursor=pointer]:
+          - /url: /sites
+          - img [ref=e18]
+          - text: Sites
+        - link "Devices" [ref=e20] [cursor=pointer]:
+          - /url: /devices
+          - img [ref=e21]
+          - text: Devices
+        - link "Alarms" [ref=e24] [cursor=pointer]:
+          - /url: /alarms
+          - img [ref=e25]
+          - text: Alarms
+        - link "Reports" [ref=e28] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e29]
+          - text: Reports
+        - link "Settings" [ref=e32] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e33]
+          - text: Settings
+      - generic [ref=e36]:
+        - paragraph [ref=e37]: BFF protected boundary
+        - paragraph [ref=e38]: Frontend reads normalized NMS data only. ThingsBoard credentials stay server-side.
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - paragraph [ref=e42]: Monitoring
+        - heading "Device Detail" [level=1] [ref=e43]
+        - paragraph [ref=e44]: Focused device operations view with normalized metrics and debug data separated.
+      - generic [ref=e45]:
+        - link "Sites" [ref=e46] [cursor=pointer]:
+          - /url: /sites
+        - text: /
+        - link "Devices" [ref=e47] [cursor=pointer]:
+          - /url: /devices
+        - text: /37cf76e0-687d-11f1-9881-537573625718
+      - paragraph [ref=e48]: Loading device dashboard...
+      - group [ref=e49]:
+        - generic "Advanced / Debug" [ref=e50]

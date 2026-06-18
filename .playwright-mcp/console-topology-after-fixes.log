@@ -1,0 +1,61 @@
+Total messages: 5 (Errors: 3, Warnings: 0)
+Returning 3 messages for level "error"
+
+[ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3000/sites/branch-b/topology:0
+[ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:3000/favicon.ico:0
+Error: Cannot find module './254.js'
+Require stack:
+- D:\kuliah\final project\nms-dashboard\apps\web\.next\server\webpack-runtime.js
+- D:\kuliah\final project\nms-dashboard\apps\web\.next\server\app\devices\page.js
+- D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\require.js
+- D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\load-components.js
+- D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\build\utils.js
+- D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\dev\hot-middleware.js
+- D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\dev\hot-reloader-webpack.js
+- D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\lib\router-utils\setup-dev-bundler.js
+- D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\lib\router-server.js
+- D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\lib\start-server.js
+    at Function.<anonymous> (node:internal/modules/cjs/loader:1383:15)
+    at <unknown> (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\require-hook.js:55:36)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1463:12)
+    at mod.require (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:147:16)
+    at __webpack_require__.f.require (file://D:\kuliah\final project\nms-dashboard\apps\web\.next\server\webpack-runtime.js:198:28)
+    at <unknown> (file://D:\kuliah\final project\nms-dashboard\apps\web\.next\server\webpack-runtime.js:111:40)
+    at Array.reduce (<anonymous>)
+    at __webpack_require__.e (file://D:\kuliah\final project\nms-dashboard\apps\web\.next\server\webpack-runtime.js:110:67)
+    at Array.map (<anonymous>)
+    at __webpack_require__.X (file://D:\kuliah\final project\nms-dashboard\apps\web\.next\server\webpack-runtime.js:162:22)
+    at <unknown> (file://D:\kuliah\final project\nms-dashboard\apps\web\.next\server\app\sites\[siteKey]\topology\page.js:6:6557)
+    at Object.<anonymous> (file://D:\kuliah\final project\nms-dashboard\apps\web\.next\server\app\sites\[siteKey]\topology\page.js:6:6606)
+    at Module._compile (node:internal/modules/cjs/loader:1706:14)
+    at Object..js (node:internal/modules/cjs/loader:1839:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.<anonymous> (node:internal/modules/cjs/loader:1463:12)
+    at mod.require (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\require-hook.js:65:28)
+    at require (node:internal/modules/helpers:147:16)
+    at requirePage (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\require.js:109:84)
+    at <unknown> (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\load-components.js:98:84)
+    at async loadComponentsImpl (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\load-components.js:98:26)
+    at async DevServer.findPageComponentsImpl (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\next-server.js:709:36)
+    at async DevServer.findPageComponents (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\dev\next-dev-server.js:577:20)
+    at async DevServer.renderPageComponent (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\base-server.js:1897:24)
+    at async DevServer.renderToResponseImpl (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\base-server.js:1949:32)
+    at async DevServer.pipeImpl (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\base-server.js:921:25)
+    at async NextNodeServer.handleCatchallRenderRequest (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\next-server.js:272:17)
+    at async DevServer.handleRequestImpl (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\base-server.js:817:17)
+    at async (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\dev\next-dev-server.js:339:20)
+    at async Span.traceAsyncFn (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\trace\trace.js:154:20)
+    at async DevServer.handleRequest (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\dev\next-dev-server.js:336:24)
+    at async invokeRender (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\lib\router-server.js:173:21)
+    at async handleRequest (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\lib\router-server.js:350:24)
+    at async requestHandlerImpl (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\lib\router-server.js:374:13)
+    at async Server.requestListener (file://D:\kuliah\final project\nms-dashboard\apps\web\node_modules\next\dist\server\lib\start-server.js:141:13)

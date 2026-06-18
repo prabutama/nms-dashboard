@@ -1,0 +1,70 @@
+- generic [active] [ref=e1] [box=0,0,914,1445]:
+  - main [ref=e2] [box=0,0,914,1445]:
+    - generic [ref=e3] [box=0,0,914,1445]:
+      - complementary [ref=e4] [box=0,0,914,494]:
+        - link "NMS Dashboard Operations Console" [ref=e5] [cursor=pointer] [box=20,24,873,40]:
+          - /url: /
+          - img [ref=e7] [box=30,34,20,20]
+          - generic [ref=e9] [box=72,24,131,40]:
+            - paragraph [ref=e10] [box=72,24,131,24]: NMS Dashboard
+            - paragraph [ref=e11] [box=72,48,131,16]: Operations Console
+        - navigation [ref=e12] [box=20,96,873,260]:
+          - link "Overview" [ref=e13] [cursor=pointer] [box=20,96,873,40]:
+            - /url: /
+            - img [ref=e14] [box=32,108,16,16]
+            - text: Overview
+          - link "Sites" [ref=e17] [cursor=pointer] [box=20,140,873,40]:
+            - /url: /sites
+            - img [ref=e18] [box=32,152,16,16]
+            - text: Sites
+          - link "Devices" [ref=e20] [cursor=pointer] [box=20,184,873,40]:
+            - /url: /devices
+            - img [ref=e21] [box=32,196,16,16]
+            - text: Devices
+          - link "Alarms" [ref=e24] [cursor=pointer] [box=20,228,873,40]:
+            - /url: /alarms
+            - img [ref=e25] [box=32,240,16,16]
+            - text: Alarms
+          - link "Reports" [ref=e28] [cursor=pointer] [box=20,272,873,40]:
+            - /url: /reports
+            - img [ref=e29] [box=32,284,16,16]
+            - text: Reports
+          - link "Settings" [ref=e32] [cursor=pointer] [box=20,316,873,40]:
+            - /url: /settings
+            - img [ref=e33] [box=32,328,16,16]
+            - text: Settings
+        - generic [ref=e36] [box=20,388,873,82]:
+          - paragraph [ref=e37] [box=37,405,839,20]: BFF protected boundary
+          - paragraph [ref=e38] [box=37,433,839,20]: Frontend reads normalized NMS data only. ThingsBoard credentials stay server-side.
+      - generic [ref=e40] [box=24,518,866,903]:
+        - generic [ref=e41] [box=24,518,866,138]:
+          - paragraph [ref=e42] [box=45,539,824,20]: Monitoring
+          - heading "Branch-B — Logical Topology" [level=1] [ref=e74] [box=45,567,824,36]
+          - paragraph [ref=e44] [box=45,611,768,24]: Inferred from IPv4 route and subnet data. Not LLDP/CDP physical cabling.
+        - generic [ref=e45] [box=24,680,866,20]:
+          - link "Sites" [ref=e46] [cursor=pointer] [box=24,680,33,20]:
+            - /url: /sites
+          - generic [ref=e47] [box=65,680,7,20]: /
+          - link "Branch-B" [ref=e75] [cursor=pointer] [box=79,680,66,20]:
+            - /url: /sites/branch-b
+          - generic [ref=e49] [box=153,680,7,20]: /
+          - generic [ref=e50] [box=168,680,65,20]: Topology
+        - generic [ref=e51] [box=24,724,866,190]:
+          - generic [ref=e52] [box=41,741,832,70]:
+            - generic [ref=e53] [box=41,741,338,70]
+            - generic [ref=e77] [box=670,741,203,26]
+          - generic [ref=e59] [box=41,827,832,70]:
+            - generic [ref=e60] [box=41,827,199,70]
+            - generic [ref=e63] [box=252,827,199,70]
+            - generic [ref=e66] [box=463,827,199,70]
+            - generic [ref=e69] [box=674,827,199,70]
+        - generic [ref=e80] [box=24,938,866,483]:
+          - generic [ref=e81] [box=25,939,864,440]:
+            - img [ref=e82] [box=60,978,795,363]
+            - generic [ref=e133] [box=37,951,149,193]
+            - generic [ref=e162] [box=37,1329,182,38]
+            - img [ref=e169] [box=778,1319,94,43]
+            - generic [ref=e183] [box=722,951,155,25]: Drag to pan · Scroll to zoom
+          - group [ref=e184] [box=25,1379,864,41]:
+            - generic "Raw edges table" [ref=e185] [cursor=pointer] [box=25,1380,864,40]
+  - alert [ref=e73] [box=-1,1444,1,1]

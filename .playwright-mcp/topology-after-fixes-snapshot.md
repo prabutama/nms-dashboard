@@ -1,0 +1,63 @@
+- generic [active] [box=8,8,913,0]:
+  - alert [ref=e1] [box=7,-1,1,1]
+  - dialog "Server Error" [ref=e4] [box=105,97,720,813]:
+    - generic [ref=e5] [box=105,97,720,813]:
+      - generic [ref=e6] [box=121,117,673,572]:
+        - navigation [ref=e8] [box=121,117,665,24]:
+          - button "previous" [disabled] [ref=e9] [box=121,117,24,24]:
+            - img "previous" [ref=e10] [box=127,123,12,12]
+          - button "next" [disabled] [ref=e12] [box=146,117,24,24]:
+            - img "next" [ref=e13] [box=152,123,12,12]
+          - generic [ref=e15] [box=186,118,70,22]: 1 of 1 error
+          - generic [ref=e16] [box=271,118,514,21]:
+            - text: Next.js (14.2.20) is outdated
+            - link "(learn more)" [ref=e18] [cursor=pointer] [box=710,119,75,19]:
+              - /url: https://nextjs.org/docs/messages/version-staleness
+        - heading "Server Error" [level=1] [ref=e19] [box=121,165,673,24]
+        - paragraph [ref=e20] [box=121,213,673,436]: "Error: Cannot find module './254.js' Require stack: - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\.next\\server\\webpack-runtime.js - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\.next\\server\\app\\devices\\page.js - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\node_modules\\next\\dist\\server\\require.js - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\node_modules\\next\\dist\\server\\load-components.js - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\node_modules\\next\\dist\\build\\utils.js - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\node_modules\\next\\dist\\server\\dev\\hot-middleware.js - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\node_modules\\next\\dist\\server\\dev\\hot-reloader-webpack.js - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\node_modules\\next\\dist\\server\\lib\\router-utils\\setup-dev-bundler.js - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\node_modules\\next\\dist\\server\\lib\\router-server.js - D:\\kuliah\\final project\\nms-dashboard\\apps\\web\\node_modules\\next\\dist\\server\\lib\\start-server.js"
+        - generic [ref=e21] [box=121,665,673,24]: This error happened while generating the page. Any console logs will be displayed in the terminal window.
+      - generic [ref=e22] [box=121,705,673,654]:
+        - heading "Call Stack" [level=2] [ref=e23] [box=121,705,673,30]
+        - group [ref=e24] [box=121,743,673,32]:
+          - generic "Next.js" [ref=e25] [cursor=pointer] [box=121,743,673,24]:
+            - img [ref=e26] [box=121,745,20,20]
+            - img [ref=e28] [box=141,745,20,20]
+            - text: Next.js
+        - generic [ref=e33] [box=121,775,673,53]:
+          - heading "TracingChannel.traceSync" [level=3] [ref=e34] [box=121,775,673,24]
+          - generic [ref=e36] [box=133,807,211,21]: node:diagnostics_channel (322:14)
+        - group [ref=e37] [box=121,844,673,32]:
+          - generic "Next.js" [ref=e38] [cursor=pointer] [box=121,844,673,24]:
+            - img [ref=e39] [box=121,846,20,20]
+            - img [ref=e41] [box=141,846,20,20]
+            - text: Next.js
+        - generic [ref=e46] [box=121,876,673,53]:
+          - heading "Array.reduce" [level=3] [ref=e47] [box=121,876,673,24]
+          - generic [ref=e49] [box=133,908,91,21]: <anonymous>
+        - group [ref=e50] [box=121,945,673,32]:
+          - generic "Next.js" [ref=e51] [cursor=pointer] [box=121,945,673,24]:
+            - img [ref=e52] [box=121,947,20,20]
+            - img [ref=e54] [box=141,947,20,20]
+            - text: Next.js
+        - generic [ref=e59] [box=121,977,673,53]:
+          - heading "Array.map" [level=3] [ref=e60] [box=121,977,673,24]
+          - generic [ref=e62] [box=133,1009,91,21]: <anonymous>
+        - group [ref=e63] [box=121,1046,673,32]:
+          - generic "Next.js" [ref=e64] [cursor=pointer] [box=121,1046,673,24]:
+            - img [ref=e65] [box=121,1048,20,20]
+            - img [ref=e67] [box=141,1048,20,20]
+            - text: Next.js
+        - generic [ref=e72] [box=121,1078,673,74]:
+          - heading "<unknown>" [level=3] [ref=e73] [box=121,1078,673,24]
+          - generic [ref=e75] [box=133,1110,661,42]: file:///D:/kuliah/final%20project/nms-dashboard/apps/web/.next/server/app/sites/[siteKey]/topology/page.js (6:6557)
+        - generic [ref=e76] [box=121,1168,673,74]:
+          - heading "Object.<anonymous>" [level=3] [ref=e77] [box=121,1168,673,24]
+          - generic [ref=e79] [box=133,1200,661,42]: file:///D:/kuliah/final%20project/nms-dashboard/apps/web/.next/server/app/sites/[siteKey]/topology/page.js (6:6606)
+        - generic [ref=e80] [box=121,1258,673,53]:
+          - heading "TracingChannel.traceSync" [level=3] [ref=e81] [box=121,1258,673,24]
+          - generic [ref=e83] [box=133,1290,211,21]: node:diagnostics_channel (322:14)
+        - group [ref=e84] [box=121,1327,673,32]:
+          - generic "Next.js" [ref=e85] [cursor=pointer] [box=121,1327,673,24]:
+            - img [ref=e86] [box=121,1329,20,20]
+            - img [ref=e88] [box=141,1329,20,20]
+            - text: Next.js

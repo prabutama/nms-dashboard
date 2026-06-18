@@ -1,0 +1,2 @@
+[      21ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/devices/37cf76e0-687d-11f1-9881-537573625718:0
+[      38ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:3001/favicon.ico:0

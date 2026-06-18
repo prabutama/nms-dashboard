@@ -1,0 +1,14 @@
+{
+  "url": "http://localhost:3000/sites/branch-b/topology",
+  "canvas": {},
+  "mainSvg": {},
+  "legend": {},
+  "controls": {},
+  "minimap": {},
+  "bodyScrollHeight": 951,
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "visibleText": "NMS Dashboard\n\nOperations Console\n\nOverview\nSites\nDevices\nAlarms\nReports\nSettings\n\nBFF protected boundary\n\nFrontend reads normalized NMS data only. ThingsBoard credentials stay server-side.\n\nMonitoring\n\nBranch-B — Logical Topology\n\nInferred from IPv4 route and subnet data. Not LLDP/CDP physical cabling.\n\nSites\n/\nBranch-B\n/\nTopology\nBranch-B — Logical Topology\nHealthy\n\nInferred from IPv4 route and subnet data.\n\nLogical inference only. Not LLDP/CDP physical cabling.\n\nGenerated 10h ago\n#abb7f7ba\n\nDevices\n\n3\n\nSubnets\n\n2\n\nEdges\n\n7\n\nExternal\n\n1\n\nEXTERNAL\nGATEWAY\nNETWORK\nENDPOINT\nNext hop\nNext hop\n10.10.10.1\nExternal Gateway\nmikrotik-br-b-router\nRouter / Gateway\n10.10.10.0/24\nSubnet\n172.16.30.0/24\nSubnet\nlinux-br-b-server\nServer\nlinux-br-b-server-2\nServer\n\nLegend\n\nRouter / Gateway\nServer / Endpoint\nSubnet / LAN\nExternal Gateway\nConnected Subnet\nDefault Route\nNext Hop\n+\n−\n⊡\n🔓\n102%\nDrag to pan · Scroll to zoom\nRaw edges table"
+}

@@ -3,17 +3,17 @@
 @tailwind utilities;
 
 :root {
-  --background: 222 47% 11%;
-  --foreground: 210 40% 98%;
-  --card: 222 47% 14%;
-  --card-foreground: 210 40% 98%;
-  --border: 217 33% 24%;
-  --muted: 217 33% 18%;
-  --muted-foreground: 215 20% 65%;
-  --primary: 188 95% 43%;
-  --primary-foreground: 222 47% 11%;
-  --accent: 274 65% 56%;
-  --accent-foreground: 210 40% 98%;
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --border: 214 32% 91%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --primary: 217 91% 60%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 213 94% 68%;
+  --accent-foreground: 222 47% 11%;
   --radius: 1rem;
 }
 
@@ -22,7 +22,31 @@
 }
 
 body {
-  background: radial-gradient(circle at top, rgba(34, 211, 238, 0.15), transparent 25%), hsl(var(--background));
+  background: hsl(var(--background));
   color: hsl(var(--foreground));
   min-height: 100vh;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  border-radius: 0;
+}
+
+.nms-map-popup .leaflet-popup-content-wrapper {
+  border: 1px solid hsl(var(--border));
+  box-shadow: none;
+}
+
+.nms-map-popup .leaflet-popup-content {
+  margin: 12px 14px;
+}
+
+.nms-map-popup__button,
+.nms-map-popup__button:visited,
+.nms-map-popup__button:hover,
+.nms-map-popup__button:active,
+.nms-map-popup__button:focus {
+  background: #1d4ed8;
+  color: #ffffff !important;
+  text-decoration: none;
 }

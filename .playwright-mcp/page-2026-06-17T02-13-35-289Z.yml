@@ -1,0 +1,95 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - complementary [ref=e4]:
+      - link "NMS Dashboard Operations Console" [ref=e5] [cursor=pointer]:
+        - /url: /
+        - img [ref=e7]
+        - generic [ref=e9]:
+          - paragraph [ref=e10]: NMS Dashboard
+          - paragraph [ref=e11]: Operations Console
+      - navigation [ref=e12]:
+        - link "Overview" [ref=e13] [cursor=pointer]:
+          - /url: /
+          - img [ref=e14]
+          - text: Overview
+        - link "Sites" [ref=e17] [cursor=pointer]:
+          - /url: /sites
+          - img [ref=e18]
+          - text: Sites
+        - link "Devices" [ref=e20] [cursor=pointer]:
+          - /url: /devices
+          - img [ref=e21]
+          - text: Devices
+        - link "Alarms" [ref=e24] [cursor=pointer]:
+          - /url: /alarms
+          - img [ref=e25]
+          - text: Alarms
+        - link "Reports" [ref=e28] [cursor=pointer]:
+          - /url: /reports
+          - img [ref=e29]
+          - text: Reports
+        - link "Settings" [ref=e32] [cursor=pointer]:
+          - /url: /settings
+          - img [ref=e33]
+          - text: Settings
+      - generic [ref=e36]:
+        - paragraph [ref=e37]: BFF protected boundary
+        - paragraph [ref=e38]: Frontend reads normalized NMS data only. ThingsBoard credentials stay server-side.
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - paragraph [ref=e42]: Monitoring
+        - heading "Overview" [level=1] [ref=e43]
+        - paragraph [ref=e44]: High-level network health across monitored sites and devices.
+      - generic [ref=e45]:
+        - generic [ref=e46]:
+          - paragraph [ref=e48]: Total Sites
+          - paragraph [ref=e49]: "0"
+          - paragraph [ref=e50]: ThingsBoard site assets
+        - generic [ref=e51]:
+          - paragraph [ref=e53]: Total Devices
+          - paragraph [ref=e54]: "0"
+          - paragraph [ref=e55]: Related devices
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - paragraph [ref=e58]: Online
+            - generic [ref=e59]: normal
+          - paragraph [ref=e60]: "0"
+          - paragraph [ref=e61]: Sampled reachable devices
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - paragraph [ref=e64]: Active Alarms
+            - generic [ref=e65]: normal
+          - paragraph [ref=e66]: "0"
+          - paragraph [ref=e67]: Loading...
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - paragraph [ref=e70]: Sampled Critical
+            - generic [ref=e71]: normal
+          - paragraph [ref=e72]: "0"
+          - paragraph [ref=e73]: From sampled dashboards
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - generic [ref=e76]:
+            - generic [ref=e77]:
+              - heading "Recent Critical Devices" [level=2] [ref=e78]
+              - paragraph [ref=e79]: Sampled from current dashboard endpoints.
+            - link "View devices" [ref=e80] [cursor=pointer]:
+              - /url: /devices
+          - paragraph [ref=e82]: No critical sampled devices. Expand device health coverage with site dashboard aggregation later.
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - generic [ref=e85]:
+              - heading "Overall Health" [level=2] [ref=e86]
+              - paragraph [ref=e87]: Summary indicators.
+            - link "View alarms" [ref=e88] [cursor=pointer]:
+              - /url: /alarms
+          - generic [ref=e89]:
+            - generic [ref=e90]:
+              - generic [ref=e91]: Stale telemetry
+              - generic [ref=e92]: normal
+            - generic [ref=e93]:
+              - generic [ref=e94]: ThingsBoard inventory
+              - generic [ref=e95]: unknown
+            - generic [ref=e96]:
+              - generic [ref=e97]: Active alarms
+              - generic [ref=e98]: normal

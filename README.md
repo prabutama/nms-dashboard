@@ -2,7 +2,7 @@
 
 Custom NMS dashboard platform using ThingsBoard as backend source for telemetry, devices, relations, attributes, catalog data, and alarms.
 
-Phase 2 adds first read-only ThingsBoard integration through BFF.
+Phase 3 combines ThingsBoard telemetry and attributes into normalized NMS dashboard view models and a clean multi-page operations UI.
 
 ## MVP decisions
 
@@ -34,13 +34,22 @@ Stack:
 * environment-based config
 * `log/slog` structured logging
 
-Phase 2 endpoints:
+Dashboard endpoints:
 
 * `GET /health`
 * `GET /api/v1/health`
 * `GET /api/v1/integrations/thingsboard/status`
 * `GET /api/v1/sites`
 * `GET /api/v1/sites/{siteKey}/devices`
+* `GET /api/v1/assets/{assetId}/attributes`
+* `GET /api/v1/devices/{deviceId}`
+* `GET /api/v1/devices/{deviceId}/attributes`
+* `GET /api/v1/devices/{deviceId}/telemetry/latest`
+* `GET /api/v1/devices/{deviceId}/telemetry/history`
+* `GET /api/v1/devices/{deviceId}/summary`
+* `GET /api/v1/devices/{deviceId}/dashboard`
+* `GET /api/v1/alarms`
+* `GET /api/v1/sites/{siteKey}/topology` — logical topology from `topology.logical.ipv4.snapshot` with enriched node classification
 
 ### Frontend
 
@@ -49,10 +58,32 @@ Stack:
 * Next.js
 * TypeScript
 * Tailwind CSS
+* Poppins font
 * shadcn-style UI primitives
 * TanStack Query
+* Recharts
 
-Phase 2 frontend includes dashboard landing page, BFF health status panel, and site list loaded from BFF.
+Frontend stays pointed at local BFF only. It does not call ThingsBoard directly.
+
+Frontend routes:
+
+* `/`: overview dashboard
+* `/sites`: monitored site inventory
+* `/sites/{siteKey}`: site detail, device list, and link to topology
+* `/sites/{siteKey}/topology`: interactive logical topology with zoom/pan, minimap, and legend
+* `/devices`: device inventory
+* `/devices/{deviceId}`: focused device dashboard
+* `/interfaces`, `/storage`, `/debug`: section scaffolds for later endpoints
+* `/alarms`: alarm list with severity, status, originator, and timeline
+
+UI theme:
+
+* white base
+* professional blue primary color
+* soft slate/gray backgrounds
+* subtle status badges
+* soft borders and shadows
+* no neon, glow, cyberpunk, or debug-first layout
 
 ## Environment variables
 
@@ -88,6 +119,8 @@ Copy env example first:
 cp .env.example .env
 ```
 
+`apps/bff` loads `.env` in local development as convenience only. Existing real environment variables still override file values.
+
 ### Run frontend
 
 ```bash
@@ -111,6 +144,7 @@ cd apps/bff
 gofmt -w .
 go test ./...
 go build ./...
+go run .
 ```
 
 ### Frontend
@@ -137,8 +171,24 @@ Frontend: `http://localhost:3000`
 
 BFF: `http://localhost:8080`
 
-## Phase 2 behavior
+## Phase 3 behavior
 
-* BFF sends `THINGSBOARD_API_KEY` to ThingsBoard only.
-* frontend reads sites only from BFF.
-* site list derives `siteKey` from asset attribute `siteKey` when present, else slug from asset name.
+* BFF sends `THINGSBOARD_API_KEY` to ThingsBoard only as `X-Authorization: ApiKey <value>`.
+* Frontend calls only local BFF.
+* BFF validates whether ThingsBoard config exists.
+* BFF performs lightweight ThingsBoard reachability check through `/api/v1/integrations/thingsboard/status`.
+* `GET /api/v1/sites` never returns `404`. It returns real sites when available, otherwise stable placeholder JSON.
+* `GET /api/v1/sites/{siteKey}/devices` resolves site relations and returns related ThingsBoard devices.
+* Attribute endpoints return raw ThingsBoard attributes for site assets and devices.
+* `GET /api/v1/devices/{deviceId}` returns basic normalized device identity.
+* `GET /api/v1/devices/{deviceId}/telemetry/latest` returns latest telemetry as key-value rows.
+* `GET /api/v1/devices/{deviceId}/summary` combines identity and latest telemetry into a compact NMS summary.
+* `GET /api/v1/devices/{deviceId}/dashboard` combines device detail, latest telemetry, device attributes, freshness, health, and metric catalog metadata into a stable NMS view model.
+* Dashboard metric metadata comes from `nmsMetrics` attributes first, built-in BFF catalog second, and generated fallback labels last.
+* Indexed interface telemetry such as `snmp.if.idx2.rx_bps` uses attributes such as `snmp.if.idx2.name = eth0` to display `eth0 RX Throughput`.
+* Indexed storage telemetry such as `snmp.host.storage.idx36.used_pct` uses storage description attributes to display labels such as `/ Storage Usage`; storage type is shown in the storage table.
+* Routing Client Attributes such as `route.ipv4.snapshot` and `route.ipv4.default.*` are normalized into a route summary and route table.
+* Raw telemetry and raw attributes remain available, but frontend shows them only under advanced/debug panels.
+* `GET /api/v1/alarms` returns tenant-wide alarms from ThingsBoard, normalized with severity, status, originator metadata, and pagination. Stable empty response when ThingsBoard is not configured or unreachable.
+* Overview dashboard and /alarms page use tenant alarm data for active alarm counts, critical severity tracking, and recent alarm tables.
+* Response never exposes ThingsBoard token.

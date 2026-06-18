@@ -14,13 +14,17 @@ import (
 )
 
 func main() {
+	if err := config.LoadDevEnv(".env"); err != nil {
+		panic(err)
+	}
+
 	cfg := config.Load()
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	httpServer := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           server.NewSkeletonRouter(cfg, logger),
+		Handler:           server.NewRouter(cfg, logger),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

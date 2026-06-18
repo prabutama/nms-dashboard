@@ -1,169 +1,414 @@
-# NMS Dashboard Platform Agent Instructions
+You are working on the `nms-dashboard` project.
 
-This project builds a custom NMS dashboard platform using ThingsBoard as the telemetry, device, relation, attribute, catalog, and alarm backend.
+Read and follow `AGENTS.md` before making changes.
 
-## Current MVP Decision
+Implement the next UI/UX and metric-label normalization phase.
 
-The MVP uses a stateless BFF.
+Current project state:
 
-There is no persistent BFF database for now.
+* BFF runs locally from `apps/bff`.
+* Frontend runs locally from `apps/web`.
+* ThingsBoard runs on a public server.
+* BFF connects to ThingsBoard using tenant API key auth.
+* BFF already exposes working endpoints:
 
-ThingsBoard remains the source of truth for:
+  * `GET /health`
+  * `GET /api/v1/health`
+  * `GET /api/v1/integrations/thingsboard/status`
+  * `GET /api/v1/sites`
+  * `GET /api/v1/sites/{siteKey}/devices`
+  * `GET /api/v1/sites/{siteKey}/alarms`
+  * `GET /api/v1/sites/{siteKey}/topology`
+  * `GET /api/v1/devices/{deviceId}`
+  * `GET /api/v1/devices/{deviceId}/telemetry/latest`
+  * `GET /api/v1/devices/{deviceId}/telemetry/history`
+  * `GET /api/v1/devices/{deviceId}/summary`
+  * `GET /api/v1/devices/{deviceId}/dashboard`
+  * `GET /api/v1/devices/{deviceId}/alarms`
+  * `GET /api/v1/devices/{deviceId}/attributes`
+  * `GET /api/v1/assets/{assetId}/attributes`
+  * `GET /api/v1/alarms`
+  * `GET /api/v1/reports/summary`
+  * `GET /api/v1/reports/sites`
+  * `GET /api/v1/reports/devices`
+* Frontend already displays sites, devices, detail, latest telemetry, history charts, summary, freshness badges, raw attributes, topology, alarms, and reports with CSV export.
 
-* devices
-* assets/sites
-* relations
-* telemetry
-* attributes
-* catalog data
-* alarms
+Main goal:
+Improve the dashboard so it looks like a clean professional system GUI, and improve metric display names by combining telemetry keys with ThingsBoard attributes.
 
-The BFF does not store raw telemetry and does not maintain its own persistent application database in the MVP.
+## Part 1 — Frontend design direction
 
-## Architecture
+Refactor the frontend UI to match a clean light system GUI style.
 
-* `apps/bff`: Go BFF API service.
-* `apps/web`: Next.js custom dashboard frontend.
-* `deploy`: Docker Compose deployment files.
-* `docs`: architecture, API contract, and development notes.
+Design requirements:
 
-## Main Responsibilities
+* Use Poppins as the main font.
+* Use light theme as the primary design.
+* Base colors:
 
-### BFF
+  * white
+  * light gray
+  * slate/dark text
+  * blue as the primary accent
+* Do not use neon colors.
+* Do not use glowing effects.
+* Do not use dark cyberpunk styling.
+* Reduce border radius significantly.
+* Prefer square or slightly rounded system panels.
+* Use thin borders, clear grid lines, and compact spacing.
+* Make the UI feel like a professional monitoring system GUI, not a soft SaaS landing dashboard.
+* Keep status colors subtle:
 
-The BFF reads ThingsBoard REST API and normalizes ThingsBoard data into NMS-friendly API responses.
+  * green for healthy/online
+  * amber for warning
+  * red for critical/offline
+  * gray for unknown/stale
 
-The BFF is responsible for:
+Layout requirements:
 
-* reading ThingsBoard REST API
-* hiding ThingsBoard credentials from the frontend
-* normalizing telemetry, attributes, relations, catalogs, and alarms
-* exposing simplified NMS API endpoints
-* optional in-memory caching for MVP
-* providing consistent response shapes for the frontend
+* Do not put everything into one long page.
+* Use a structured multi-page or multi-section dashboard.
+* Recommended navigation:
 
-The BFF must not:
+  * Overview
+  * Sites
+  * Devices
+  * Alarms
+  * Reports
+  * Settings
+* Device detail should have tabs or sections:
 
-* collect SNMP/ICMP data
-* store raw telemetry permanently
-* implement persistent database storage in MVP
-* implement custom RBAC in MVP
-* expose ThingsBoard API keys to the frontend
+  * Overview
+  * Metrics
+  * Interfaces
+  * Storage
+  * Alarms
+  * Attributes
+  * Advanced / Debug
 
-### Frontend
+UI structure:
 
-The frontend is responsible for:
+1. Top bar:
 
-* rendering the custom NMS dashboard UI
-* calling only the BFF API
-* displaying site overview
-* displaying device list
-* displaying device detail
-* displaying charts, tables, and topology views
-* polling/refetching data from the BFF
+   * app title
+   * current time or refresh info
+   * time range selector
+   * refresh button
+   * user/admin indicator placeholder
 
-The frontend must never call ThingsBoard directly.
+2. Left sidebar:
 
-### ThingsBoard
+   * NMS Dashboard logo/title
+   * navigation menu
+   * selected item uses solid blue background
+   * minimal icons if already available
 
-ThingsBoard remains the backend for:
+3. Overview page:
 
-* telemetry storage
-* latest telemetry
-* historical timeseries
-* device registry
-* asset/site relations
-* attributes/catalog
-* alarms
+   * KPI cards:
 
-## MVP Scope
+     * total sites
+     * total devices
+     * online devices
+     * active alarms
+     * average uptime if available
+   * health distribution
+   * active alarms table
+   * recent devices table
+   * top sites by alarms if data exists
 
-Phase 1 focuses only on project skeleton:
+4. Sites page:
 
-* Go BFF skeleton
-* Next.js frontend skeleton
-* Docker Compose
-* documentation
+   * site table/list
+   * device count
+   * alarm count
+   * status
+   * last update
+   * search/filter UI placeholder
 
-No ThingsBoard integration yet in Phase 1.
+5. Site detail page:
 
-## Future Scope
+   * site identity
+   * site health
+   * device count
+   * device list
+   * recent alarms
+   * attributes tab/panel
 
-Future phases may add:
+6. Device detail page:
 
-* ThingsBoard REST client
-* normalized site/device APIs
-* device summary API
-* interface normalization
-* storage normalization
-* route normalization
-* alarm normalization
-* Redis cache
-* authentication
-* persistent database
-* custom RBAC
-* audit logs
-* dashboard preferences
+   * device identity header
+   * health summary cards
+   * metric cards
+   * history charts
+   * interface table
+   * storage table
+   * raw telemetry and raw attributes moved to Advanced / Debug collapsible panel
 
-## Suggested Project Structure
+Frontend constraints:
 
-```txt
-nms-dashboard-platform/
-├─ apps/
-│  ├─ bff/
-│  └─ web/
-├─ deploy/
-├─ docs/
-└─ README.md
+* Frontend must never call ThingsBoard directly.
+* Frontend must call only the BFF.
+* Keep existing data functionality working.
+* Do not remove raw telemetry or attributes, but move them to Advanced / Debug.
+* Do not add authentication.
+* Do not add PostgreSQL.
+* Do not add Redis.
+* Do not add new chart library beyond existing Recharts.
+
+## Part 2 — Metric display name normalization
+
+Current problem:
+Some metrics are displayed using raw indexed telemetry names, for example:
+
+`Snmp IF Idx2 RX BPS`
+
+This is not readable for users.
+
+The device attributes already contain index-to-name metadata, for example:
+
+`snmp.if.idx2.name = eth0`
+
+The dashboard should use this attribute to display a better label.
+
+Expected behavior:
+
+* Keep raw metric keys unchanged internally.
+* Improve display labels in BFF response and frontend rendering.
+* Do not rename telemetry keys in ThingsBoard.
+* Only change normalized display metadata.
+
+Example transformation:
+
+Raw telemetry key:
+
+`snmp.if.idx2.rx_bps`
+
+Device attribute:
+
+`snmp.if.idx2.name = eth0`
+
+Display label should become:
+
+`eth0 RX Throughput`
+
+Other examples:
+
+* `snmp.if.idx2.tx_bps` → `eth0 TX Throughput`
+* `snmp.if.idx2.oper_status` → `eth0 Operational Status`
+* `snmp.if.idx2.admin_status` → `eth0 Admin Status`
+* `snmp.if.idx2.speed_bps` → `eth0 Link Speed`
+* `snmp.if.idx2.in_errors` → `eth0 RX Errors`
+* `snmp.if.idx2.out_errors` → `eth0 TX Errors`
+
+If the interface name attribute is missing:
+
+* fallback to `Interface idx2 RX Throughput`
+* never show ugly labels such as `Snmp IF Idx2 RX BPS` in the main dashboard
+
+## BFF metric metadata resolver
+
+Add or improve a BFF metric metadata resolver.
+
+The resolver should:
+
+1. Accept:
+
+   * raw telemetry key
+   * latest telemetry value
+   * device attributes
+   * optional static metric catalog
+
+2. Return normalized metadata:
+
+   * raw key
+   * display label
+   * value
+   * unit
+   * group
+   * subgroup/entity name if relevant
+   * status
+   * freshness
+   * updatedAt
+   * display order
+
+3. Support interface indexed metrics.
+
+Pattern:
+
+* `snmp.if.idx{index}.{metric}`
+
+Attribute lookup:
+
+* `snmp.if.idx{index}.name`
+* optional future fallback:
+
+  * `snmp.if.idx{index}.alias`
+  * `snmp.if.idx{index}.description`
+
+Examples:
+
+* key: `snmp.if.idx2.rx_bps`
+* attr: `snmp.if.idx2.name = eth0`
+* group: `interfaces`
+* subgroup: `eth0`
+* label: `eth0 RX Throughput`
+* unit: `bps`
+
+4. Support storage indexed metrics if present.
+
+Pattern:
+
+* `snmp.storage.idx{index}.{metric}`
+
+Attribute lookup:
+
+* `snmp.storage.idx{index}.description`
+* optional fallback:
+
+  * `snmp.storage.idx{index}.name`
+
+Examples:
+
+* `snmp.storage.idx36.used_pct`
+* `snmp.storage.idx36.description = /`
+* display label: `/ Storage Usage`
+* group: `storage`
+* unit: `%`
+
+5. Support common non-indexed metrics.
+
+Examples:
+
+* `icmp.reachable` → `Reachability`
+* `icmp.latency_ms` → `Latency`
+* `icmp.packet_loss_pct` → `Packet Loss`
+* `icmp.jitter_ms` → `Jitter`
+* `snmp.host.cpu.load_pct` → `CPU Usage`
+* `snmp.host.memory.used_pct` → `Memory Usage`
+* `snmp.host.swap.used_pct` → `Swap Usage`
+
+6. Support fallback formatting.
+
+If the key is unknown:
+
+* generate a readable label from the key
+* remove technical prefix if possible
+* replace dots/underscores with spaces
+* title case words
+* keep group `other`
+
+But indexed interface/storage metrics must prefer attribute-based names when attributes exist.
+
+## Endpoint impact
+
+Apply this normalization to:
+
+* `GET /api/v1/devices/{deviceId}/dashboard`
+* `GET /api/v1/devices/{deviceId}/summary` if applicable
+* frontend metric cards
+* frontend chart titles
+* interface/storage sections if applicable
+
+Do not break existing endpoints.
+
+If `/api/v1/devices/{deviceId}/dashboard` does not exist yet, add it as the preferred frontend endpoint for device detail.
+
+Expected metric object example:
+
+```json
+{
+  "key": "snmp.if.idx2.rx_bps",
+  "label": "eth0 RX Throughput",
+  "value": 123456,
+  "unit": "bps",
+  "group": "interfaces",
+  "subgroup": "eth0",
+  "status": "normal",
+  "freshness": "fresh",
+  "updatedAt": "2026-06-15T19:05:03Z",
+  "displayOrder": 310
+}
 ```
 
-## Environment Variables
+Expected interface group example:
 
-BFF environment variables:
+```json
+{
+  "name": "eth0",
+  "index": "2",
+  "metrics": [
+    {
+      "key": "snmp.if.idx2.rx_bps",
+      "label": "RX Throughput",
+      "value": 123456,
+      "unit": "bps"
+    },
+    {
+      "key": "snmp.if.idx2.tx_bps",
+      "label": "TX Throughput",
+      "value": 654321,
+      "unit": "bps"
+    }
+  ]
+}
+```
 
-* `PORT`
-* `THINGSBOARD_BASE_URL`
-* `THINGSBOARD_API_KEY`
-* `CACHE_TTL_SECONDS`
+Important:
 
-No `DATABASE_URL` is required for MVP.
+* In grouped interface tables, labels may be shorter such as `RX Throughput` because the row already shows `eth0`.
+* In standalone metric cards or charts, use full label such as `eth0 RX Throughput`.
 
-Frontend environment variables:
+## Frontend rendering rules
 
-* `NEXT_PUBLIC_API_BASE_URL`
+Frontend should prefer BFF-provided labels.
+
+Rules:
+
+* Use `label` from BFF if available.
+* Use `unit` from BFF if available.
+* Use `group` to place metrics into sections.
+* Use `subgroup` for interface/storage grouping.
+* Do not re-generate ugly labels in frontend unless BFF label is missing.
+* Chart titles must use human-readable labels.
+* Tables must display interface/storage names from attributes where available.
+
+## Documentation
+
+Update:
+
+* `README.md`
+* `docs/API_CONTRACT.md`
+* `docs/DEVELOPMENT_STAGES.md`
+* `docs/METRIC_CATALOG.md`
+* `docs/ARCHITECTURE.md`
+
+Document:
+
+* light system GUI design direction
+* metric display names are resolved from telemetry + attributes
+* indexed interface metrics use `snmp.if.idx{index}.name`
+* indexed storage metrics use storage description/name attributes
+* raw telemetry keys remain unchanged
+* normalized labels are for dashboard display only
 
 ## Validation
 
-After each change, run relevant validation.
+From `apps/bff`:
 
-For BFF:
+* run `gofmt`
+* run `go test ./...`
+* run `go build ./...`
 
-```bash
-gofmt
-go test ./...
-go build ./...
-```
+From `apps/web`:
 
-For frontend:
+* run `npm run build`
+* run `npm run lint`
 
-```bash
-npm run build
-npm run lint
-```
+From project root:
 
-For Docker:
+* run:
 
-```bash
-docker compose -f deploy/docker-compose.yml config
-```
+  * `docker compose -f deploy/docker-compose.yml config`
 
-## Documentation Rules
-
-Every implementation phase must update:
-
-* `docs/ARCHITECTURE.md`
-* `docs/API_CONTRACT.md`
-* `docs/DEVELOPMENT_STAGES.md`
-* `README.md`
-
-Do not mark a phase as complete unless validation succeeds.
+Only mark the task complete if validation succeeds.

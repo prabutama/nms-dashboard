@@ -26,6 +26,7 @@ func NewRouter(cfg config.Config, logger *slog.Logger) http.Handler {
 	router.Use(chimiddleware.RealIP)
 	router.Use(chimiddleware.Recoverer)
 	router.Use(requestLogger(logger))
+	router.Use(corsMiddleware(cfg.CORSAllowedOrigins))
 
 	newAPIServer(cfg, logger).registerRoutes(router)
 
