@@ -417,35 +417,31 @@ func (c *Client) GetTelemetryHistoryWithBearer(ctx context.Context, bearerToken 
 }
 
 func (c *Client) AcknowledgeAlarm(ctx context.Context, alarmID string) (AlarmInfo, error) {
-	var response AlarmInfo
-	if err := c.postJSON(ctx, "/api/alarm/"+alarmID+"/ack", nil, &response); err != nil {
+	if err := c.postJSON(ctx, "/api/alarm/"+alarmID+"/ack", nil, nil); err != nil {
 		return AlarmInfo{}, err
 	}
-	return response, nil
+	return AlarmInfo{ID: entityIDResponse{ID: alarmID}}, nil
 }
 
 func (c *Client) AcknowledgeAlarmWithBearer(ctx context.Context, bearerToken string, alarmID string) (AlarmInfo, error) {
-	var response AlarmInfo
-	if err := c.postJSONWithBearer(ctx, "/api/alarm/"+alarmID+"/ack", nil, bearerToken, &response); err != nil {
+	if err := c.postJSONWithBearer(ctx, "/api/alarm/"+alarmID+"/ack", nil, bearerToken, nil); err != nil {
 		return AlarmInfo{}, err
 	}
-	return response, nil
+	return AlarmInfo{ID: entityIDResponse{ID: alarmID}}, nil
 }
 
 func (c *Client) ClearAlarm(ctx context.Context, alarmID string) (AlarmInfo, error) {
-	var response AlarmInfo
-	if err := c.postJSON(ctx, "/api/alarm/"+alarmID+"/clear", nil, &response); err != nil {
+	if err := c.postJSON(ctx, "/api/alarm/"+alarmID+"/clear", nil, nil); err != nil {
 		return AlarmInfo{}, err
 	}
-	return response, nil
+	return AlarmInfo{ID: entityIDResponse{ID: alarmID}}, nil
 }
 
 func (c *Client) ClearAlarmWithBearer(ctx context.Context, bearerToken string, alarmID string) (AlarmInfo, error) {
-	var response AlarmInfo
-	if err := c.postJSONWithBearer(ctx, "/api/alarm/"+alarmID+"/clear", nil, bearerToken, &response); err != nil {
+	if err := c.postJSONWithBearer(ctx, "/api/alarm/"+alarmID+"/clear", nil, bearerToken, nil); err != nil {
 		return AlarmInfo{}, err
 	}
-	return response, nil
+	return AlarmInfo{ID: entityIDResponse{ID: alarmID}}, nil
 }
 
 func (c *Client) Login(ctx context.Context, username string, password string) (LoginResponse, error) {

@@ -1076,6 +1076,179 @@ func TestAlarmClearLoadedFromThingsBoard(t *testing.T) {
 	}
 }
 
+func TestAlarmAckSucceedsWithEmptyThingsBoardBody(t *testing.T) {
+	t.Parallel()
+
+	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/auth/user":
+			if got := r.Header.Get("X-Authorization"); got != "Bearer user-token" {
+				t.Fatalf("unexpected auth header %s", got)
+			}
+			_, _ = w.Write([]byte(`{"id":{"entityType":"USER","id":"user-1"},"tenantId":{"entityType":"TENANT","id":"tenant-1"},"customerId":{"entityType":"CUSTOMER","id":"customer-1"},"email":"admin@example.com","authority":"TENANT_ADMIN","firstName":"Admin","lastName":"User"}`))
+		case "/api/alarm/alarm-1/ack":
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer thingsBoard.Close()
+
+	router := NewRouter(config.Config{
+		Port:                "8080",
+		ThingsBoardBaseURL:  thingsBoard.URL,
+		ThingsBoardAPIKey:   "test-token",
+		ThingsBoardSiteType: "default",
+		CORSAllowedOrigins:  []string{"http://localhost:3000"},
+		CacheTTLSeconds:     30,
+		HasThingsBoardSetup: true,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/alarms/alarm-1/ack", nil)
+	req.Header.Set("Authorization", "Bearer user-token")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	body := res.Body.String()
+	for _, expected := range []string{`"ok":true`, `"action":"ack"`, `"alarmId":"alarm-1"`, `"status":"ACTIVE_ACK"`, `"acknowledged":true`} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %s in ack response: %s", expected, body)
+		}
+	}
+}
+
+func TestAlarmClearSucceedsWithEmptyThingsBoardBody(t *testing.T) {
+	t.Parallel()
+
+	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/auth/user":
+			_, _ = w.Write([]byte(`{"id":{"entityType":"USER","id":"user-1"},"tenantId":{"entityType":"TENANT","id":"tenant-1"},"customerId":{"entityType":"CUSTOMER","id":"customer-1"},"email":"admin@example.com","authority":"TENANT_ADMIN","firstName":"Admin","lastName":"User"}`))
+		case "/api/alarm/alarm-1/clear":
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer thingsBoard.Close()
+
+	router := NewRouter(config.Config{
+		Port:                "8080",
+		ThingsBoardBaseURL:  thingsBoard.URL,
+		ThingsBoardAPIKey:   "test-token",
+		ThingsBoardSiteType: "default",
+		CORSAllowedOrigins:  []string{"http://localhost:3000"},
+		CacheTTLSeconds:     30,
+		HasThingsBoardSetup: true,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/alarms/alarm-1/clear", nil)
+	req.Header.Set("Authorization", "Bearer user-token")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	body := res.Body.String()
+	for _, expected := range []string{`"ok":true`, `"action":"clear"`, `"alarmId":"alarm-1"`, `"status":"CLEARED_ACK"`, `"cleared":true`} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %s in clear response: %s", expected, body)
+		}
+	}
+}
+
+func TestAlarmAckSucceedsWithPlainTextThingsBoardBody(t *testing.T) {
+	t.Parallel()
+
+	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		switch r.URL.Path {
+		case "/api/auth/user":
+			_, _ = w.Write([]byte(`{"id":{"entityType":"USER","id":"user-1"},"tenantId":{"entityType":"TENANT","id":"tenant-1"},"customerId":{"entityType":"CUSTOMER","id":"customer-1"},"email":"admin@example.com","authority":"TENANT_ADMIN","firstName":"Admin","lastName":"User"}`))
+		case "/api/alarm/alarm-1/ack":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("OK"))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer thingsBoard.Close()
+
+	router := NewRouter(config.Config{
+		Port:                "8080",
+		ThingsBoardBaseURL:  thingsBoard.URL,
+		ThingsBoardAPIKey:   "test-token",
+		ThingsBoardSiteType: "default",
+		CORSAllowedOrigins:  []string{"http://localhost:3000"},
+		CacheTTLSeconds:     30,
+		HasThingsBoardSetup: true,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/alarms/alarm-1/ack", nil)
+	req.Header.Set("Authorization", "Bearer user-token")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	body := res.Body.String()
+	for _, expected := range []string{`"ok":true`, `"action":"ack"`, `"alarmId":"alarm-1"`, `"status":"ACTIVE_ACK"`, `"acknowledged":true`} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %s in ack response: %s", expected, body)
+		}
+	}
+}
+
+func TestAlarmClearSucceedsWithPlainTextThingsBoardBody(t *testing.T) {
+	t.Parallel()
+
+	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		switch r.URL.Path {
+		case "/api/auth/user":
+			_, _ = w.Write([]byte(`{"id":{"entityType":"USER","id":"user-1"},"tenantId":{"entityType":"TENANT","id":"tenant-1"},"customerId":{"entityType":"CUSTOMER","id":"customer-1"},"email":"admin@example.com","authority":"TENANT_ADMIN","firstName":"Admin","lastName":"User"}`))
+		case "/api/alarm/alarm-1/clear":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte("OK"))
+		default:
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer thingsBoard.Close()
+
+	router := NewRouter(config.Config{
+		Port:                "8080",
+		ThingsBoardBaseURL:  thingsBoard.URL,
+		ThingsBoardAPIKey:   "test-token",
+		ThingsBoardSiteType: "default",
+		CORSAllowedOrigins:  []string{"http://localhost:3000"},
+		CacheTTLSeconds:     30,
+		HasThingsBoardSetup: true,
+	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/alarms/alarm-1/clear", nil)
+	req.Header.Set("Authorization", "Bearer user-token")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
+	}
+	body := res.Body.String()
+	for _, expected := range []string{`"ok":true`, `"action":"clear"`, `"alarmId":"alarm-1"`, `"status":"CLEARED_ACK"`, `"cleared":true`} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("expected %s in clear response: %s", expected, body)
+		}
+	}
+}
+
 func TestAlarmAckNotConfigured(t *testing.T) {
 	t.Parallel()
 

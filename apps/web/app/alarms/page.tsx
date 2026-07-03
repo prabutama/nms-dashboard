@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { useAuth } from "@/components/auth-provider";
 import { StatCard, StatusBadge } from "@/components/nms-ui";
 import { ackAlarm, clearAlarm, fetchAlarms } from "@/lib/api";
-import type { Alarm } from "@/lib/types";
+import type { Alarm, AlarmListResponse } from "@/lib/types";
 
 function SeverityBadge({ severity }: { severity: string }) {
   const cls = severity === "CRITICAL" ? "bg-red-50 text-red-700"
@@ -30,6 +31,46 @@ function StatusLabel({ status }: { status: string }) {
 function tsDisplay(ts?: string) {
   if (!ts) return "-";
   return new Date(ts).toLocaleString();
+}
+
+function patchAlarmList(
+  current: AlarmListResponse | undefined,
+  alarmId: string,
+  updater: (alarm: Alarm) => Alarm | null,
+): AlarmListResponse | undefined {
+  if (!current) {
+    return current;
+  }
+
+  const items = current.items
+    .map((alarm) => {
+      if (alarm.alarmId !== alarmId) {
+        return alarm;
+      }
+      return updater(alarm);
+    })
+    .filter((alarm): alarm is Alarm => alarm !== null);
+
+  return {
+    ...current,
+    items,
+    totalElements: items.length,
+    totalPages: items.length === 0 ? 0 : current.totalPages,
+    hasNext: false,
+  };
+}
+
+async function invalidateAlarmQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["alarms"] }),
+    queryClient.invalidateQueries({ queryKey: ["alarms", "overview"] }),
+    queryClient.invalidateQueries({ queryKey: ["alarms", "overview-all"] }),
+    queryClient.invalidateQueries({ queryKey: ["site-alarms"] }),
+    queryClient.invalidateQueries({ queryKey: ["device-alarms"] }),
+    queryClient.invalidateQueries({ queryKey: ["report-summary"] }),
+    queryClient.invalidateQueries({ queryKey: ["reports-sites"] }),
+    queryClient.invalidateQueries({ queryKey: ["reports-devices"] }),
+  ]);
 }
 
 function AlarmRow({
@@ -85,6 +126,7 @@ export default function AlarmsPage() {
   const router = useRouter();
   const { user, isAuthenticated, ready } = useAuth();
   const queryClient = useQueryClient();
+  const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const alarmsQuery = useQuery({
     queryKey: ["alarms"],
     queryFn: () => fetchAlarms({ searchStatus: "ACTIVE", pageSize: 50 }),
@@ -93,19 +135,48 @@ export default function AlarmsPage() {
 
   const ackMutation = useMutation({
     mutationFn: ackAlarm,
+    onMutate: async (alarmId) => {
+      setFeedback(null);
+      await queryClient.cancelQueries({ queryKey: ["alarms"] });
+      const previous = queryClient.getQueryData<AlarmListResponse>(["alarms"]);
+      queryClient.setQueryData<AlarmListResponse | undefined>(["alarms"], (current) => patchAlarmList(current, alarmId, (alarm) => ({
+        ...alarm,
+        acknowledged: true,
+        status: alarm.cleared ? "CLEARED_ACK" : "ACTIVE_ACK",
+        ackAt: alarm.ackAt || new Date().toISOString(),
+      })));
+      return { previous };
+    },
+    onError: (error, _alarmId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["alarms"], context.previous);
+      }
+      setFeedback({ type: "error", message: error.message });
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["alarms"] });
-      await queryClient.invalidateQueries({ queryKey: ["alarms", "overview"] });
-      await queryClient.invalidateQueries({ queryKey: ["alarms", "overview-all"] });
+      setFeedback({ type: "success", message: "Alarm acknowledged." });
+      await invalidateAlarmQueries(queryClient);
     },
   });
 
   const clearMutation = useMutation({
     mutationFn: clearAlarm,
+    onMutate: async (alarmId) => {
+      setFeedback(null);
+      await queryClient.cancelQueries({ queryKey: ["alarms"] });
+      const previous = queryClient.getQueryData<AlarmListResponse>(["alarms"]);
+      queryClient.setQueryData<AlarmListResponse | undefined>(["alarms"], (current) => patchAlarmList(current, alarmId, () => null));
+      return { previous };
+    },
+    onError: (error, _alarmId, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["alarms"], context.previous);
+      }
+      setFeedback({ type: "error", message: error.message });
+    },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["alarms"] });
-      await queryClient.invalidateQueries({ queryKey: ["alarms", "overview"] });
-      await queryClient.invalidateQueries({ queryKey: ["alarms", "overview-all"] });
+      setFeedback({ type: "success", message: "Alarm cleared." });
+      await invalidateAlarmQueries(queryClient);
     },
   });
 
@@ -138,8 +209,14 @@ export default function AlarmsPage() {
         <StatCard title="Access" value={canManage ? "Operator" : "Read Only"} status={canManage ? "normal" : "unknown"} />
       </div>
 
-      {ackMutation.error ? <p className="border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{ackMutation.error.message}</p> : null}
-      {clearMutation.error ? <p className="border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700">{clearMutation.error.message}</p> : null}
+      {feedback ? (
+        <p className={feedback.type === "success"
+          ? "border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700"
+          : "border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700"}
+        >
+          {feedback.message}
+        </p>
+      ) : null}
 
       {alarmsQuery.isLoading ? (
         <p className="border border-slate-200 bg-slate-50 px-4 py-5 text-xs text-slate-500">Loading alarms...</p>

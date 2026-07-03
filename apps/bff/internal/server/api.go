@@ -209,7 +209,7 @@ func (s *apiServer) registerRoutes(r chi.Router) {
 			r.Use(s.requireTBAuth())
 			r.Get("/auth/me", s.authMeHandler())
 			r.Post("/auth/logout", s.authLogoutHandler())
-			r.With(s.cacheGetResponse(30*time.Second)).Get("/alarms", s.alarmsHandler())
+			r.Get("/alarms", s.alarmsHandler())
 			r.With(s.cacheGetResponse(60*time.Second)).Get("/sites", s.sitesHandler())
 			r.With(s.cacheGetResponse(30*time.Second)).Get("/sites/{siteKey}/devices", s.siteDevicesHandler())
 			r.Get("/sites/{siteKey}/alarms", s.siteAlarmsHandler())
@@ -415,6 +415,20 @@ func (s *apiServer) handleAlarmAction(w http.ResponseWriter, r *http.Request, ac
 	message := "Alarm acknowledged"
 	if action == "clear" {
 		message = "Alarm cleared"
+	}
+	if alarm.ID.ID == "" {
+		alarm.ID.ID = alarmID
+	}
+	if action == "ack" {
+		alarm.Acknowledged = true
+		if alarm.Status == "" {
+			alarm.Status = "ACTIVE_ACK"
+		}
+	} else if action == "clear" {
+		alarm.Cleared = true
+		if alarm.Status == "" {
+			alarm.Status = "CLEARED_ACK"
+		}
 	}
 	writeJSON(w, http.StatusOK, alarmActionResponse{
 		OK:      true,
