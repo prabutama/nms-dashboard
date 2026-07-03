@@ -55,29 +55,29 @@ function SummaryStrip({ data }: { data: { summary: { siteCount: number; deviceCo
 }
 
 function SitesTable({ rows }: { rows: ReportSiteRow[] }) {
-  if (rows.length === 0) return <p className="px-4 py-5 text-xs text-slate-500">No site data available.</p>;
+  if (rows.length === 0) return <p className="px-4 py-5 text-xs text-slate-600">No site data available.</p>;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-xs">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50/80">
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Site</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Devices</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Online</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Stale</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Alarms</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Critical</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Health</th>
+          <tr className="border-b border-slate-300 bg-slate-100/90">
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Site</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Devices</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Online</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Stale</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Alarms</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Critical</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Health</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-slate-200">
           {rows.map((row) => (
-            <tr key={row.siteKey} className="hover:bg-blue-50/40">
+            <tr key={row.siteKey} className="hover:bg-slate-100">
               <td className="px-4 py-2.5 font-medium text-slate-950">{row.siteName}</td>
-              <td className="px-4 py-2.5 text-slate-600">{row.deviceCount}</td>
+              <td className="px-4 py-2.5 text-slate-700">{row.deviceCount}</td>
               <td className="px-4 py-2.5 text-emerald-700">{row.onlineDeviceCount}</td>
               <td className="px-4 py-2.5 text-amber-700">{row.staleDeviceCount}</td>
-              <td className="px-4 py-2.5 text-slate-600">{row.activeAlarmCount}</td>
+              <td className="px-4 py-2.5 text-slate-700">{row.activeAlarmCount}</td>
               <td className="px-4 py-2.5 text-red-700">{row.criticalAlarmCount}</td>
               <td className="px-4 py-2.5"><StatusBadge status={row.health} /></td>
             </tr>
@@ -89,37 +89,37 @@ function SitesTable({ rows }: { rows: ReportSiteRow[] }) {
 }
 
 function DevicesTable({ rows, showSiteKey }: { rows: ReportDeviceRow[]; showSiteKey?: boolean }) {
-  if (rows.length === 0) return <p className="px-4 py-5 text-xs text-slate-500">No device data available.</p>;
+  if (rows.length === 0) return <p className="px-4 py-5 text-xs text-slate-600">No device data available.</p>;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-left text-xs">
         <thead>
-          <tr className="border-b border-slate-200 bg-slate-50/80">
-            {showSiteKey ? <th className="px-4 py-2.5 font-semibold text-slate-600">Site</th> : null}
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Device</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Type</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Health</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Reachable</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Alarms</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Latency</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Loss</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">CPU</th>
-            <th className="px-4 py-2.5 font-semibold text-slate-600">Memory</th>
+          <tr className="border-b border-slate-300 bg-slate-100/90">
+            {showSiteKey ? <th className="px-4 py-2.5 font-semibold text-slate-700">Site</th> : null}
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Device</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Type</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Health</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Reachable</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Alarms</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Latency</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Loss</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">CPU</th>
+            <th className="px-4 py-2.5 font-semibold text-slate-700">Memory</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-slate-200">
           {rows.map((row) => (
-            <tr key={row.deviceId} className="hover:bg-blue-50/40">
-              {showSiteKey ? <td className="px-4 py-2.5 font-medium text-slate-600">{row.siteKey}</td> : null}
+            <tr key={row.deviceId} className="hover:bg-slate-100">
+              {showSiteKey ? <td className="px-4 py-2.5 font-medium text-slate-700">{row.siteKey}</td> : null}
               <td className="px-4 py-2.5 font-medium text-slate-950">{row.name}</td>
-              <td className="px-4 py-2.5 text-slate-500">{row.type}</td>
+              <td className="px-4 py-2.5 text-slate-700">{row.type}</td>
               <td className="px-4 py-2.5"><StatusBadge status={row.health} /></td>
               <td className="px-4 py-2.5"><StatusBadge status={row.reachable ? "online" : "offline"} /></td>
-              <td className="px-4 py-2.5 text-slate-600">{row.alarmCount}</td>
-              <td className="px-4 py-2.5 text-slate-600">{row.avgLatencyMs > 0 ? `${row.avgLatencyMs.toFixed(1)} ms` : "--"}</td>
-              <td className="px-4 py-2.5 text-slate-600">{row.packetLossPct > 0 ? `${row.packetLossPct.toFixed(1)}%` : "--"}</td>
-              <td className="px-4 py-2.5 text-slate-600">{row.cpuAvgPct > 0 ? `${row.cpuAvgPct.toFixed(1)}%` : "--"}</td>
-              <td className="px-4 py-2.5 text-slate-600">{row.memoryAvgPct > 0 ? `${row.memoryAvgPct.toFixed(1)}%` : "--"}</td>
+              <td className="px-4 py-2.5 text-slate-700">{row.alarmCount}</td>
+              <td className="px-4 py-2.5 text-slate-700">{row.avgLatencyMs > 0 ? `${row.avgLatencyMs.toFixed(1)} ms` : "--"}</td>
+              <td className="px-4 py-2.5 text-slate-700">{row.packetLossPct > 0 ? `${row.packetLossPct.toFixed(1)}%` : "--"}</td>
+              <td className="px-4 py-2.5 text-slate-700">{row.cpuAvgPct > 0 ? `${row.cpuAvgPct.toFixed(1)}%` : "--"}</td>
+              <td className="px-4 py-2.5 text-slate-700">{row.memoryAvgPct > 0 ? `${row.memoryAvgPct.toFixed(1)}%` : "--"}</td>
             </tr>
           ))}
         </tbody>
@@ -185,33 +185,33 @@ export function ReportsDashboard() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-slate-500">Period:</span>
+            <span className="text-xs font-semibold text-slate-700">Period:</span>
             <div className="flex gap-px">
               {RANGES.map((r) => (
-                <button key={r.value} onClick={() => setRange(r.value)} className={`px-3 py-1.5 text-xs font-medium transition ${range === r.value ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
+                <button key={r.value} onClick={() => setRange(r.value)} className={`border px-3 py-1.5 text-xs font-medium transition ${range === r.value ? "border-blue-800 bg-blue-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}>
                   {r.label}
                 </button>
               ))}
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {summaryQuery.data?.generatedAt ? <span className="text-[11px] text-slate-400">Generated {new Date(summaryQuery.data.generatedAt).toLocaleString()}</span> : null}
+            {summaryQuery.data?.generatedAt ? <span className="text-[11px] text-slate-600">Generated {new Date(summaryQuery.data.generatedAt).toLocaleString()}</span> : null}
           </div>
         </div>
 
-        {summaryQuery.error ? <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{summaryQuery.error.message}</p> : null}
-        {summaryQuery.isLoading ? <p className="py-4 text-xs text-slate-500">Loading report data...</p> : null}
+        {summaryQuery.error ? <p className="border border-red-200 bg-red-100 px-4 py-3 text-sm text-red-800">{summaryQuery.error.message}</p> : null}
+        {summaryQuery.isLoading ? <p className="py-4 text-xs text-slate-600">Loading report data...</p> : null}
 
         <SummaryStrip data={summaryQuery.data} />
 
-        <div className="border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="border border-slate-300 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-4 py-3">
             <div>
-              <p className="text-xs font-semibold text-slate-700">Sites Report</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Per-site device counts, alarm counts, and health.</p>
+              <p className="text-xs font-semibold text-slate-800">Sites Report</p>
+              <p className="mt-0.5 text-[11px] text-slate-600">Per-site device counts, alarm counts, and health.</p>
             </div>
             {siteRows.length > 0 ? (
-              <button onClick={handleExportSitesCSV} className="px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 border border-blue-200">
+              <button onClick={handleExportSitesCSV} className="border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-50">
                 Export CSV
               </button>
             ) : null}
@@ -219,14 +219,14 @@ export function ReportsDashboard() {
           <SitesTable rows={siteRows} />
         </div>
 
-        <div className="border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="border border-slate-300 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-4 py-3">
             <div>
-              <p className="text-xs font-semibold text-slate-700">Devices Report</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Per-device health, alarm count, and key metrics.</p>
+              <p className="text-xs font-semibold text-slate-800">Devices Report</p>
+              <p className="mt-0.5 text-[11px] text-slate-600">Per-device health, alarm count, and key metrics.</p>
             </div>
             {deviceRows.length > 0 ? (
-              <button onClick={handleExportDevicesCSV} className="px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 border border-blue-200">
+              <button onClick={handleExportDevicesCSV} className="border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-50">
                 Export CSV
               </button>
             ) : null}

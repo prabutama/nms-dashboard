@@ -56,7 +56,7 @@ export function OverviewDashboard() {
 
   return (
     <DashboardShell title="Overview" subtitle="High-level network health across monitored sites and devices.">
-      {sitesQuery.error ? <p className="border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{sitesQuery.error.message}</p> : null}
+      {sitesQuery.error ? <p className="border border-red-200 bg-red-100 px-4 py-3 text-sm text-red-800">{sitesQuery.error.message}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-5">
         <StatCard title="Sites" value={sitesQuery.data?.items.length || 0} note="ThingsBoard assets" />
@@ -67,36 +67,36 @@ export function OverviewDashboard() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-        <div className="border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="border border-slate-300 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-4 py-3">
             <div>
-              <p className="text-xs font-semibold text-slate-700">Critical & Warning Devices</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Derived from aggregated device reports.</p>
+              <p className="text-xs font-semibold text-slate-800">Critical & Warning Devices</p>
+              <p className="mt-0.5 text-[11px] text-slate-600">Derived from aggregated device reports.</p>
             </div>
-            <Link href="/devices" className="bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-blue-700">View devices</Link>
+            <Link href="/devices" className="border border-blue-800 bg-blue-700 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-blue-800">View devices</Link>
           </div>
-          {summaryQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-500">Loading device health...</p> : null}
-          {criticalDevices.length === 0 ? <p className="border-b border-slate-100 px-4 py-5 text-xs text-slate-500">No critical devices among the sampled set.</p> : null}
+          {summaryQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-600">Loading device health...</p> : null}
+          {criticalDevices.length === 0 ? <p className="border-b border-slate-200 px-4 py-5 text-xs text-slate-600">No critical devices among the sampled set.</p> : null}
           {criticalDevices.map((device) => (
             <DeviceLink key={device.deviceId} href={`/devices/${device.deviceId}${device.siteKey ? `?site=${device.siteKey}` : ""}`} name={device.name} type={device.type} status={device.health} />
           ))}
         </div>
 
-        <div className="border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold text-slate-700">Summary Indicators</p>
+        <div className="border border-slate-300 bg-white shadow-sm">
+          <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+            <p className="text-xs font-semibold text-slate-800">Summary Indicators</p>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-200">
             <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-xs text-slate-600">Stale telemetry</span>
+              <span className="text-xs text-slate-700">Stale telemetry</span>
               <StatusBadge status={staleCount > 0 ? "warning" : "normal"} />
             </div>
             <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-xs text-slate-600">ThingsBoard inventory</span>
+              <span className="text-xs text-slate-700">ThingsBoard inventory</span>
               <StatusBadge status={sitesQuery.data ? "normal" : "unknown"} />
             </div>
             <div className="flex items-center justify-between px-4 py-3">
-              <span className="text-xs text-slate-600">Active alarms</span>
+              <span className="text-xs text-slate-700">Active alarms</span>
               <StatusBadge status={activeAlarmCount > 0 ? "warning" : "normal"} />
             </div>
           </div>
@@ -106,33 +106,33 @@ export function OverviewDashboard() {
       <SiteMapPanel items={siteMapItems} totalSites={sitesQuery.data?.items.length || 0} missingCoordinateCount={missingCoordinateCount} />
 
       {recentAlarms.length > 0 ? (
-        <div className="border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+        <div className="border border-slate-300 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-4 py-3">
             <div>
-              <p className="text-xs font-semibold text-slate-700">Recent Alarms</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Latest events across all devices.</p>
+              <p className="text-xs font-semibold text-slate-800">Recent Alarms</p>
+              <p className="mt-0.5 text-[11px] text-slate-600">Latest events across all devices.</p>
             </div>
-            <Link href="/alarms" className="bg-blue-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-blue-700">View all</Link>
+            <Link href="/alarms" className="border border-blue-800 bg-blue-700 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-blue-800">View all</Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="px-4 py-2 font-medium text-slate-500">Severity</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Type</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Originator</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Status</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Created</th>
+                <tr className="border-b border-slate-300 bg-slate-100/80">
+                  <th className="px-4 py-2 font-semibold text-slate-700">Severity</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Type</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Originator</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Status</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Created</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {recentAlarms.map((alarm) => (
                   <tr key={alarm.alarmId}>
                     <td className="px-4 py-2"><StatusBadge status={alarm.severity === "CRITICAL" ? "critical" : alarm.severity === "WARNING" || alarm.severity === "MAJOR" || alarm.severity === "MINOR" ? "warning" : "unknown"} /></td>
                     <td className="px-4 py-2 font-medium text-slate-950">{alarm.type}</td>
-                    <td className="px-4 py-2 text-slate-600">{alarm.originatorLabel || alarm.originatorName || "-"}</td>
-                    <td className="px-4 py-2 text-slate-600">{alarm.status}</td>
-                    <td className="px-4 py-2 text-slate-600">{alarm.createdAt ? new Date(alarm.createdAt).toLocaleString() : "-"}</td>
+                    <td className="px-4 py-2 text-slate-700">{alarm.originatorLabel || alarm.originatorName || "-"}</td>
+                    <td className="px-4 py-2 text-slate-700">{alarm.status}</td>
+                    <td className="px-4 py-2 text-slate-700">{alarm.createdAt ? new Date(alarm.createdAt).toLocaleString() : "-"}</td>
                   </tr>
                 ))}
               </tbody>

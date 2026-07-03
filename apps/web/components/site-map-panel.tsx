@@ -35,29 +35,29 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount }: { it
   };
 
   return (
-    <div className="border border-slate-200 bg-white">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="border border-slate-300 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-4 py-3">
         <div>
-          <p className="text-xs font-semibold text-slate-700">Site Map</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">Branch locations from site latitude and longitude attributes.</p>
+          <p className="text-xs font-semibold text-slate-800">Site Map</p>
+          <p className="mt-0.5 text-[11px] text-slate-600">Branch locations from site latitude and longitude attributes.</p>
         </div>
-        <div className="flex items-center gap-4 text-[11px] text-slate-500">
+        <div className="flex items-center gap-4 text-[11px] text-slate-700">
           <span>{items.length} / {totalSites} mapped</span>
           <span>{missingCoordinateCount} missing coordinates</span>
         </div>
       </div>
       {items.length === 0 ? (
-        <div className="px-4 py-10 text-center text-xs text-slate-500">No site coordinates available.</div>
+        <div className="px-4 py-10 text-center text-xs text-slate-600">No site coordinates available.</div>
       ) : (
         <div className="p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
+          <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-700">
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" />Normal</span>
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />Warning</span>
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-600" />Critical</span>
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-500" />Unknown</span>
           </div>
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-            <div className="overflow-hidden border border-slate-200 bg-slate-50">
+            <div className="overflow-hidden border border-slate-300 bg-slate-100">
               <MapContainer ref={mapRef} bounds={indonesiaBounds} scrollWheelZoom className="h-[360px] w-full" attributionControl={false}>
                 <FitMapToSites items={items} />
                 <TileLayer
@@ -87,7 +87,7 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount }: { it
                       <Popup className="nms-map-popup">
                         <div className="min-w-[190px] text-xs text-slate-700">
                           <p className="font-semibold text-slate-950">{item.name}</p>
-                          <p className="mt-0.5 text-slate-500">{item.siteKey}</p>
+                          <p className="mt-0.5 text-slate-600">{item.siteKey}</p>
                           <div className="mt-2 space-y-1">
                             <p>Health: <span className="font-medium capitalize text-slate-950">{item.health}</span></p>
                             <p>Devices: <span className="font-medium text-slate-950">{item.deviceCount}</span></p>
@@ -95,7 +95,7 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount }: { it
                             <p>Active alarms: <span className="font-medium text-slate-950">{item.activeAlarmCount}</span></p>
                             <p>{item.latitude.toFixed(4)}, {item.longitude.toFixed(4)}</p>
                           </div>
-                          <Link href={`/sites/${item.siteKey}`} className="nms-map-popup__button mt-3 inline-flex border border-blue-700 bg-blue-700 px-3 py-1.5 text-[11px] font-semibold text-white no-underline">
+                          <Link href={`/sites/${item.siteKey}`} className="nms-map-popup__button mt-3 inline-flex border border-blue-800 bg-blue-700 px-3 py-1.5 text-[11px] font-semibold text-white no-underline">
                             Open site detail
                           </Link>
                         </div>
@@ -105,12 +105,12 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount }: { it
                 })}
               </MapContainer>
             </div>
-            <div className="border border-slate-200 bg-white">
-              <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-                <p className="text-xs font-semibold text-slate-700">Mapped Sites</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">Hover or click a row to focus marker.</p>
+            <div className="border border-slate-300 bg-white shadow-sm">
+              <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+                <p className="text-xs font-semibold text-slate-800">Mapped Sites</p>
+                <p className="mt-0.5 text-[11px] text-slate-600">Hover or click a row to focus marker.</p>
               </div>
-              <div className="max-h-[360px] overflow-auto divide-y divide-slate-100">
+              <div className="max-h-[360px] overflow-auto divide-y divide-slate-200">
                 {sortedItems.map((item) => {
                   const emphasized = activeSiteKey === item.siteKey || selectedSiteKey === item.siteKey;
                   return (
@@ -120,12 +120,12 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount }: { it
                       onMouseEnter={() => setActiveSiteKey(item.siteKey)}
                       onMouseLeave={() => setActiveSiteKey((current) => (current === item.siteKey ? null : current))}
                       onClick={() => focusSite(item)}
-                      className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${emphasized ? "bg-blue-50" : "hover:bg-slate-50"}`}
+                      className={`flex w-full items-start justify-between gap-3 px-4 py-3 text-left transition ${emphasized ? "bg-blue-50" : "hover:bg-slate-100"}`}
                     >
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-slate-950">{item.name}</p>
-                        <p className="mt-0.5 text-[11px] text-slate-500">{item.siteKey}</p>
-                        <p className="mt-1 text-[11px] text-slate-500">{item.onlineDeviceCount}/{item.deviceCount} online · {item.activeAlarmCount} alarms</p>
+                        <p className="mt-0.5 text-[11px] text-slate-600">{item.siteKey}</p>
+                        <p className="mt-1 text-[11px] text-slate-600">{item.onlineDeviceCount}/{item.deviceCount} online · {item.activeAlarmCount} alarms</p>
                       </div>
                       <span className={`mt-0.5 inline-flex h-2.5 w-2.5 rounded-full ${healthDotClass(item.health)}`} />
                     </button>

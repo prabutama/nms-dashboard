@@ -64,7 +64,7 @@ export function SiteTopologyView({ siteKey }: { siteKey: string }) {
 
   return (
     <DashboardShell title={`${siteName} — Logical Topology`} subtitle="Inferred from IPv4 route and subnet data. Not LLDP/CDP physical cabling.">
-      <div className="flex text-xs text-slate-500">
+      <div className="flex text-xs text-slate-600">
         <Link href="/sites" className="text-blue-600 hover:text-blue-700">Sites</Link>
         <span className="mx-2">/</span>
         <Link href={`/sites/${siteKey}`} className="text-blue-600 hover:text-blue-700">{siteName}</Link>
@@ -73,21 +73,21 @@ export function SiteTopologyView({ siteKey }: { siteKey: string }) {
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <div className="border border-slate-200 bg-white px-4 py-2.5"><p className="text-[11px] text-slate-500">Devices</p><p className="text-sm font-semibold text-slate-950">{topology?.summary.deviceCount ?? "-"}</p></div>
-        <div className="border border-slate-200 bg-white px-4 py-2.5"><p className="text-[11px] text-slate-500">Subnets</p><p className="text-sm font-semibold text-slate-950">{topology?.summary.subnetCount ?? "-"}</p></div>
-        <div className="border border-slate-200 bg-white px-4 py-2.5"><p className="text-[11px] text-slate-500">Edges</p><p className="text-sm font-semibold text-slate-950">{topology?.summary.edgeCount ?? "-"}</p></div>
-        <div className="border border-slate-200 bg-white px-4 py-2.5"><p className="text-[11px] text-slate-500">Generated</p><p className="text-sm font-semibold text-slate-950">{topology?.generatedAt ? new Date(topology.generatedAt).toLocaleString() : "-"}</p></div>
+        <div className="border border-slate-300 bg-white px-4 py-2.5 shadow-sm"><p className="text-[11px] text-slate-600">Devices</p><p className="text-sm font-semibold text-slate-950">{topology?.summary.deviceCount ?? "-"}</p></div>
+        <div className="border border-slate-300 bg-white px-4 py-2.5 shadow-sm"><p className="text-[11px] text-slate-600">Subnets</p><p className="text-sm font-semibold text-slate-950">{topology?.summary.subnetCount ?? "-"}</p></div>
+        <div className="border border-slate-300 bg-white px-4 py-2.5 shadow-sm"><p className="text-[11px] text-slate-600">Edges</p><p className="text-sm font-semibold text-slate-950">{topology?.summary.edgeCount ?? "-"}</p></div>
+        <div className="border border-slate-300 bg-white px-4 py-2.5 shadow-sm"><p className="text-[11px] text-slate-600">Generated</p><p className="text-sm font-semibold text-slate-950">{topology?.generatedAt ? new Date(topology.generatedAt).toLocaleString() : "-"}</p></div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <div className="border border-slate-200 bg-white px-4 py-2.5"><p className="text-[11px] text-slate-500">Supported</p><p className="text-sm font-semibold text-slate-950">{topology?.supported ? "yes" : "no"}</p></div>
-        <div className="border border-slate-200 bg-white px-4 py-2.5"><p className="text-[11px] text-slate-500">Raw Nodes</p><p className="text-sm font-semibold text-slate-950">{topology?.nodes.length ?? 0}</p></div>
-        <div className="border border-slate-200 bg-white px-4 py-2.5"><p className="text-[11px] text-slate-500">Raw Edges</p><p className="text-sm font-semibold text-slate-950">{topology?.edges.length ?? 0}</p></div>
-        <div className="border border-slate-200 bg-white px-4 py-2.5"><p className="text-[11px] text-slate-500">Source</p><p className="text-sm font-semibold text-slate-950">{topology?.source || "-"}</p></div>
+        <div className="border border-slate-300 bg-white px-4 py-2.5 shadow-sm"><p className="text-[11px] text-slate-600">Supported</p><p className="text-sm font-semibold text-slate-950">{topology?.supported ? "yes" : "no"}</p></div>
+        <div className="border border-slate-300 bg-white px-4 py-2.5 shadow-sm"><p className="text-[11px] text-slate-600">Raw Nodes</p><p className="text-sm font-semibold text-slate-950">{topology?.nodes.length ?? 0}</p></div>
+        <div className="border border-slate-300 bg-white px-4 py-2.5 shadow-sm"><p className="text-[11px] text-slate-600">Raw Edges</p><p className="text-sm font-semibold text-slate-950">{topology?.edges.length ?? 0}</p></div>
+        <div className="border border-slate-300 bg-white px-4 py-2.5 shadow-sm"><p className="text-[11px] text-slate-600">Source</p><p className="text-sm font-semibold text-slate-950">{topology?.source || "-"}</p></div>
       </div>
 
       {!hasTopology ? (
-        <div className="border border-slate-200 bg-white px-6 py-10 text-center text-xs text-slate-500">
+        <div className="border border-slate-300 bg-white px-6 py-10 text-center text-xs text-slate-600 shadow-sm">
           No topology data available for this site.
         </div>
       ) : (

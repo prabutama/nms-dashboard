@@ -10,12 +10,12 @@ import { ackAlarm, clearAlarm, fetchAlarms } from "@/lib/api";
 import type { Alarm, AlarmListResponse } from "@/lib/types";
 
 function SeverityBadge({ severity }: { severity: string }) {
-  const cls = severity === "CRITICAL" ? "bg-red-50 text-red-700"
-    : severity === "MAJOR" ? "bg-orange-50 text-orange-700"
-    : severity === "MINOR" ? "bg-amber-50 text-amber-700"
-    : severity === "WARNING" ? "bg-yellow-50 text-yellow-700"
-    : "bg-slate-100 text-slate-600";
-  return <span className={`inline-flex px-1.5 py-0.5 text-[11px] font-medium ${cls}`}>{severity}</span>;
+  const cls = severity === "CRITICAL" ? "border border-red-200 bg-red-100 text-red-800"
+    : severity === "MAJOR" ? "border border-orange-200 bg-orange-100 text-orange-800"
+    : severity === "MINOR" ? "border border-amber-200 bg-amber-100 text-amber-800"
+    : severity === "WARNING" ? "border border-yellow-200 bg-yellow-100 text-yellow-800"
+    : "border border-slate-300 bg-slate-200 text-slate-700";
+  return <span className={`inline-flex px-1.5 py-0.5 text-[11px] font-semibold ${cls}`}>{severity}</span>;
 }
 
 function StatusLabel({ status }: { status: string }) {
@@ -25,7 +25,7 @@ function StatusLabel({ status }: { status: string }) {
     CLEARED_UNACK: "Cleared / Unack",
     CLEARED_ACK: "Cleared / Ack",
   };
-  return <span className="text-xs text-slate-600">{map[status] || status}</span>;
+  return <span className="text-xs text-slate-700">{map[status] || status}</span>;
 }
 
 function tsDisplay(ts?: string) {
@@ -90,9 +90,9 @@ function AlarmRow({
     <tr className="divide-x divide-slate-100">
       <td className="px-4 py-2"><SeverityBadge severity={alarm.severity} /></td>
       <td className="px-4 py-2 text-xs font-medium text-slate-950">{alarm.type}</td>
-      <td className="px-4 py-2 text-xs text-slate-600">{alarm.originatorLabel || alarm.originatorName || "-"}</td>
+      <td className="px-4 py-2 text-xs text-slate-700">{alarm.originatorLabel || alarm.originatorName || "-"}</td>
       <td className="px-4 py-2"><StatusLabel status={alarm.status} /></td>
-      <td className="px-4 py-2 text-xs text-slate-600">{tsDisplay(alarm.createdAt)}</td>
+      <td className="px-4 py-2 text-xs text-slate-700">{tsDisplay(alarm.createdAt)}</td>
       <td className="px-4 py-2">{alarm.acknowledged ? <StatusBadge status="normal" /> : <StatusBadge status="warning" />}</td>
       <td className="px-4 py-2">
         <div className="flex items-center gap-2">
@@ -101,7 +101,7 @@ function AlarmRow({
               type="button"
               onClick={() => onAck(alarm.alarmId)}
               disabled={pendingAction !== null}
-              className="border border-slate-300 px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="border border-slate-400 px-2.5 py-1 text-[11px] font-medium text-slate-800 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {pendingAction === "ack" ? "Acking..." : "Acknowledge"}
             </button>
@@ -111,7 +111,7 @@ function AlarmRow({
               type="button"
               onClick={() => onClear(alarm.alarmId)}
               disabled={pendingAction !== null}
-              className="border border-blue-700 bg-blue-700 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="border border-blue-800 bg-blue-700 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {pendingAction === "clear" ? "Clearing..." : "Clear"}
             </button>
@@ -211,36 +211,36 @@ export default function AlarmsPage() {
 
       {feedback ? (
         <p className={feedback.type === "success"
-          ? "border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-700"
-          : "border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-700"}
+          ? "border border-emerald-200 bg-emerald-100 px-4 py-3 text-xs text-emerald-800"
+          : "border border-red-200 bg-red-100 px-4 py-3 text-xs text-red-800"}
         >
           {feedback.message}
         </p>
       ) : null}
 
       {alarmsQuery.isLoading ? (
-        <p className="border border-slate-200 bg-slate-50 px-4 py-5 text-xs text-slate-500">Loading alarms...</p>
+        <p className="border border-slate-300 bg-slate-100 px-4 py-5 text-xs text-slate-600 shadow-sm">Loading alarms...</p>
       ) : activeAlarms.length === 0 ? (
-        <div className="border border-slate-200 bg-white px-6 py-10 text-center text-xs text-slate-500">No active alarms.</div>
+        <div className="border border-slate-300 bg-white px-6 py-10 text-center text-xs text-slate-600 shadow-sm">No active alarms.</div>
       ) : (
-        <div className="border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold text-slate-700">Active Alarms ({totalActive})</p>
+        <div className="border border-slate-300 bg-white shadow-sm">
+          <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+            <p className="text-xs font-semibold text-slate-800">Active Alarms ({totalActive})</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="px-4 py-2 font-medium text-slate-500">Severity</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Type</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Originator</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Status</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Created</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Acked</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Actions</th>
+                <tr className="border-b border-slate-300 bg-slate-100/80">
+                  <th className="px-4 py-2 font-semibold text-slate-700">Severity</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Type</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Originator</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Status</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Created</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Acked</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {activeAlarms.map((alarm) => (
                   <AlarmRow
                     key={alarm.alarmId}

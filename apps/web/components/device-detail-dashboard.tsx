@@ -58,7 +58,7 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
 
   return (
     <DashboardShell title={dashboard?.device.label || dashboard?.device.name || "Device Detail"} subtitle="Focused device operations view with normalized metrics and debug data separated.">
-      <div className="flex text-xs text-slate-500">
+      <div className="flex text-xs text-slate-600">
         <Link href="/sites" className="text-blue-600 hover:text-blue-700">Sites</Link>
         <span className="mx-2">/</span>
         <Link href="/devices" className="text-blue-600 hover:text-blue-700">Devices</Link>
@@ -66,25 +66,25 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
         <span className="break-all">{deviceId}</span>
       </div>
 
-      {dashboardQuery.isLoading ? <p className="border border-slate-200 bg-white px-4 py-5 text-xs text-slate-500">Loading device dashboard...</p> : null}
-      {dashboardQuery.error ? <p className="border border-red-100 bg-red-50 px-4 py-3 text-xs text-red-700">{dashboardQuery.error.message}</p> : null}
+      {dashboardQuery.isLoading ? <p className="border border-slate-300 bg-white px-4 py-5 text-xs text-slate-600 shadow-sm">Loading device dashboard...</p> : null}
+      {dashboardQuery.error ? <p className="border border-red-200 bg-red-100 px-4 py-3 text-xs text-red-800">{dashboardQuery.error.message}</p> : null}
 
       {dashboard ? (
         <>
-          <div className="border border-slate-200 bg-white">
-            <div className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="border border-slate-300 bg-white shadow-sm">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-300 bg-slate-100 px-4 py-3">
               <div>
                 <div className="flex items-center gap-3">
                   <h2 className="text-sm font-semibold text-slate-950">{dashboard.device.label || dashboard.device.name}</h2>
                   <StatusBadge status={dashboard.health.status} />
                 </div>
-                <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
                   <span>Name: {dashboard.device.name || "--"}</span>
                   <span>Type: {dashboard.device.type || "--"}</span>
                   <span>Profile: {dashboard.device.profile || "--"}</span>
                 </div>
               </div>
-              <Link href="/devices" className="border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50 shrink-0">All devices</Link>
+              <Link href="/devices" className="shrink-0 border border-slate-400 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:bg-slate-100">All devices</Link>
             </div>
           </div>
 
@@ -99,16 +99,16 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
             {visibleCards.map((metric) => <MetricCard key={metric.key} metric={metric} />)}
           </div>
 
-          <div className="border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold text-slate-700">Metric Groups</p>
+          <div className="border border-slate-300 bg-white shadow-sm">
+            <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+              <p className="text-xs font-semibold text-slate-800">Metric Groups</p>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-slate-200">
               {visibleGroups.map((group) => (
                 <div key={group.group} className="px-4 py-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <p className="text-xs font-medium text-slate-700">{group.title}</p>
-                    <span className="text-[11px] text-slate-400">{group.items.length} metrics</span>
+                    <p className="text-xs font-semibold text-slate-800">{group.title}</p>
+                    <span className="text-[11px] text-slate-600">{group.items.length} metrics</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {group.items.map((metric) => <MetricCard key={metric.key} metric={metric} />)}
@@ -118,25 +118,25 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
             </div>
           </div>
 
-          <div className="border border-slate-200 bg-white">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="border border-slate-300 bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-3 border-b border-slate-300 bg-slate-100 px-4 py-3">
               <div>
-                <p className="text-xs font-semibold text-slate-700">Telemetry Charts</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">Historical charts for selected operational metrics. Full raw telemetry remains in Advanced / Debug.</p>
+                <p className="text-xs font-semibold text-slate-800">Telemetry Charts</p>
+                <p className="mt-0.5 text-[11px] text-slate-600">Historical charts for selected operational metrics. Full raw telemetry remains in Advanced / Debug.</p>
               </div>
               <div className="flex gap-px">
                 {CHART_RANGES.map((item) => (
-                  <button key={item.value} onClick={() => setRange(item.value)} className={`px-3 py-1.5 text-[11px] font-medium transition ${range === item.value ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-100"}`}>
+                  <button key={item.value} onClick={() => setRange(item.value)} className={`border px-3 py-1.5 text-[11px] font-medium transition ${range === item.value ? "border-blue-800 bg-blue-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}>
                     {item.label}
                   </button>
                 ))}
               </div>
             </div>
-            {chartKeys.length === 0 ? <p className="px-4 py-5 text-xs text-slate-500">No chartable metrics available for this device.</p> : null}
-            {historyQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-500">Loading charts...</p> : null}
+            {chartKeys.length === 0 ? <p className="px-4 py-5 text-xs text-slate-600">No chartable metrics available for this device.</p> : null}
+            {historyQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-600">Loading charts...</p> : null}
             {historyQuery.error ? <p className="px-4 py-5 text-xs text-red-600">{historyQuery.error.message}</p> : null}
-            {chartKeys.length > 0 && historyQuery.data && historyQuery.data.series.length === 0 ? <p className="px-4 py-5 text-xs text-slate-500">{historyQuery.data.message || "No telemetry history available for selected time window."}</p> : null}
-            {chartKeys.length > 0 && historyQuery.data && historyQuery.data.series.length > 0 && visibleChartSeries.length === 0 ? <p className="px-4 py-5 text-xs text-slate-500">No numeric chart data available in selected time window.</p> : null}
+            {chartKeys.length > 0 && historyQuery.data && historyQuery.data.series.length === 0 ? <p className="px-4 py-5 text-xs text-slate-600">{historyQuery.data.message || "No telemetry history available for selected time window."}</p> : null}
+            {chartKeys.length > 0 && historyQuery.data && historyQuery.data.series.length > 0 && visibleChartSeries.length === 0 ? <p className="px-4 py-5 text-xs text-slate-600">No numeric chart data available in selected time window.</p> : null}
             <div className="grid gap-4 p-4 xl:grid-cols-2">
               {visibleChartSeries.map((series) => (
                 <TelemetryChart
@@ -158,34 +158,34 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
 
           <RoutingPanel routing={dashboard.routing} />
 
-          <div className="border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold text-slate-700">Alarms</p>
-              <p className="mt-0.5 text-[11px] text-slate-500">Active alarms for this device, polling every 15s.</p>
+          <div className="border border-slate-300 bg-white shadow-sm">
+            <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+              <p className="text-xs font-semibold text-slate-800">Alarms</p>
+              <p className="mt-0.5 text-[11px] text-slate-600">Active alarms for this device, polling every 15s.</p>
             </div>
-            {alarmsQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-500">Loading alarms...</p> : null}
+            {alarmsQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-600">Loading alarms...</p> : null}
             {alarmsQuery.error ? <p className="px-4 py-5 text-xs text-red-600">{alarmsQuery.error.message}</p> : null}
             {alarmsQuery.data ? (
               alarmsQuery.data.items.length === 0 ? (
-                <p className="px-4 py-5 text-xs text-slate-500">No active alarms for this device.</p>
+                <p className="px-4 py-5 text-xs text-slate-600">No active alarms for this device.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200">
-                        <th className="px-4 py-2 font-medium text-slate-500">Type</th>
-                        <th className="px-4 py-2 font-medium text-slate-500">Severity</th>
-                        <th className="px-4 py-2 font-medium text-slate-500">Status</th>
-                        <th className="px-4 py-2 font-medium text-slate-500">Created</th>
+                      <tr className="border-b border-slate-300 bg-slate-100/80">
+                        <th className="px-4 py-2 font-semibold text-slate-700">Type</th>
+                        <th className="px-4 py-2 font-semibold text-slate-700">Severity</th>
+                        <th className="px-4 py-2 font-semibold text-slate-700">Status</th>
+                        <th className="px-4 py-2 font-semibold text-slate-700">Created</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-slate-200">
                       {alarmsQuery.data.items.slice(0, 10).map((alarm) => (
                         <tr key={alarm.alarmId}>
                           <td className="px-4 py-2 font-medium text-slate-950">{alarm.name || alarm.type}</td>
                           <td className="px-4 py-2"><StatusBadge status={alarm.severity === "CRITICAL" ? "critical" : "warning"} /></td>
-                          <td className="px-4 py-2 text-slate-600">{alarm.cleared ? "Cleared" : alarm.acknowledged ? "Acknowledged" : "Active"}</td>
-                          <td className="px-4 py-2 text-slate-500">{alarm.createdAt ? new Date(alarm.createdAt).toLocaleString() : "--"}</td>
+                          <td className="px-4 py-2 text-slate-700">{alarm.cleared ? "Cleared" : alarm.acknowledged ? "Acknowledged" : "Active"}</td>
+                          <td className="px-4 py-2 text-slate-700">{alarm.createdAt ? new Date(alarm.createdAt).toLocaleString() : "--"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -196,16 +196,16 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
           </div>
 
           {canReadDebug ? (
-          <details className="border border-slate-200 bg-white">
-            <summary className="cursor-pointer bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-700">Advanced / Debug</summary>
+          <details className="border border-slate-300 bg-white shadow-sm">
+            <summary className="cursor-pointer bg-slate-100 px-4 py-3 text-xs font-semibold text-slate-800">Advanced / Debug</summary>
             <div className="grid gap-4 p-4 xl:grid-cols-2">
               <div>
-                <p className="text-xs font-medium text-slate-700">Raw latest telemetry</p>
-                <pre className="mt-2 max-h-64 overflow-auto bg-slate-50 p-3 text-xs text-slate-600">{JSON.stringify(telemetryQuery.data || {}, null, 2)}</pre>
+                <p className="text-xs font-semibold text-slate-800">Raw latest telemetry</p>
+                <pre className="mt-2 max-h-64 overflow-auto bg-slate-100 p-3 text-xs text-slate-700">{JSON.stringify(telemetryQuery.data || {}, null, 2)}</pre>
               </div>
               <div>
-                <p className="text-xs font-medium text-slate-700">Raw device attributes</p>
-                <pre className="mt-2 max-h-64 overflow-auto bg-slate-50 p-3 text-xs text-slate-600">{JSON.stringify(attributesQuery.data || {}, null, 2)}</pre>
+                <p className="text-xs font-semibold text-slate-800">Raw device attributes</p>
+                <pre className="mt-2 max-h-64 overflow-auto bg-slate-100 p-3 text-xs text-slate-700">{JSON.stringify(attributesQuery.data || {}, null, 2)}</pre>
               </div>
             </div>
           </details>
@@ -311,33 +311,33 @@ function getHistoryRangeParams(range: ChartRange) {
 
 function InterfaceTable({ items }: { items: DeviceDashboardResponse["interfaces"] }) {
   return (
-    <div className="border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs font-semibold text-slate-700">Interfaces</p>
+    <div className="border border-slate-300 bg-white shadow-sm">
+      <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+        <p className="text-xs font-semibold text-slate-800">Interfaces</p>
       </div>
-      {items.length === 0 ? <p className="px-4 py-5 text-xs text-slate-500">No interface metadata available.</p> : null}
+      {items.length === 0 ? <p className="px-4 py-5 text-xs text-slate-600">No interface metadata available.</p> : null}
       {items.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-2 font-medium text-slate-500">Interface</th>
-                <th className="px-4 py-2 font-medium text-slate-500">RX</th>
-                <th className="px-4 py-2 font-medium text-slate-500">TX</th>
-                <th className="px-4 py-2 font-medium text-slate-500">Oper</th>
-                <th className="px-4 py-2 font-medium text-slate-500">Admin</th>
-                <th className="px-4 py-2 font-medium text-slate-500">Speed</th>
+              <tr className="border-b border-slate-300 bg-slate-100/80">
+                <th className="px-4 py-2 font-semibold text-slate-700">Interface</th>
+                <th className="px-4 py-2 font-semibold text-slate-700">RX</th>
+                <th className="px-4 py-2 font-semibold text-slate-700">TX</th>
+                <th className="px-4 py-2 font-semibold text-slate-700">Oper</th>
+                <th className="px-4 py-2 font-semibold text-slate-700">Admin</th>
+                <th className="px-4 py-2 font-semibold text-slate-700">Speed</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {items.map((item) => (
                 <tr key={`iface-${item.index || item.name}`}>
                   <td className="px-4 py-2 font-medium text-slate-950">{item.name || item.label}</td>
-                  <td className="px-4 py-2 font-mono text-[11px] text-slate-600">{formatBitrate(item.rxBps || 0)}</td>
-                  <td className="px-4 py-2 font-mono text-[11px] text-slate-600">{formatBitrate(item.txBps || 0)}</td>
-                  <td className="px-4 py-2 text-slate-600">{item.status || "--"}</td>
-                  <td className="px-4 py-2 text-slate-600">{item.adminStatus || "--"}</td>
-                  <td className="px-4 py-2 font-mono text-[11px] text-slate-600">{formatBitrate(item.linkSpeed || 0)}</td>
+                  <td className="px-4 py-2 font-mono text-[11px] text-slate-700">{formatBitrate(item.rxBps || 0)}</td>
+                  <td className="px-4 py-2 font-mono text-[11px] text-slate-700">{formatBitrate(item.txBps || 0)}</td>
+                  <td className="px-4 py-2 text-slate-700">{item.status || "--"}</td>
+                  <td className="px-4 py-2 text-slate-700">{item.adminStatus || "--"}</td>
+                  <td className="px-4 py-2 font-mono text-[11px] text-slate-700">{formatBitrate(item.linkSpeed || 0)}</td>
                 </tr>
               ))}
             </tbody>
@@ -350,31 +350,31 @@ function InterfaceTable({ items }: { items: DeviceDashboardResponse["interfaces"
 
 function StorageTable({ items }: { items: DeviceDashboardResponse["storage"] }) {
   return (
-    <div className="border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs font-semibold text-slate-700">Storage</p>
+    <div className="border border-slate-300 bg-white shadow-sm">
+      <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+        <p className="text-xs font-semibold text-slate-800">Storage</p>
       </div>
-      {items.length === 0 ? <p className="px-4 py-5 text-xs text-slate-500">No storage metadata available.</p> : null}
+      {items.length === 0 ? <p className="px-4 py-5 text-xs text-slate-600">No storage metadata available.</p> : null}
       {items.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-200">
-                <th className="px-4 py-2 font-medium text-slate-500">Name</th>
-                <th className="px-4 py-2 font-medium text-slate-500">Type</th>
-                <th className="px-4 py-2 font-medium text-slate-500">Usage</th>
-                <th className="px-4 py-2 font-medium text-slate-500">Status</th>
-                <th className="px-4 py-2 font-medium text-slate-500">Updated</th>
+              <tr className="border-b border-slate-300 bg-slate-100/80">
+                <th className="px-4 py-2 font-semibold text-slate-700">Name</th>
+                <th className="px-4 py-2 font-semibold text-slate-700">Type</th>
+                <th className="px-4 py-2 font-semibold text-slate-700">Usage</th>
+                <th className="px-4 py-2 font-semibold text-slate-700">Status</th>
+                <th className="px-4 py-2 font-semibold text-slate-700">Updated</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-200">
               {items.map((item) => (
                 <tr key={`storage-${item.index || item.name}`}>
                   <td className="px-4 py-2 font-medium text-slate-950">{item.name || item.label}</td>
-                  <td className="px-4 py-2 text-slate-600">{item.type || "--"}</td>
-                  <td className="px-4 py-2 text-slate-600">{item.usedPct !== undefined ? formatMetricValue(item.usedPct, "%") : "--"}</td>
-                  <td className="px-4 py-2 text-slate-600">{item.status || "unknown"}</td>
-                  <td className="px-4 py-2 text-slate-400">{item.updatedAt || "--"}</td>
+                  <td className="px-4 py-2 text-slate-700">{item.type || "--"}</td>
+                  <td className="px-4 py-2 text-slate-700">{item.usedPct !== undefined ? formatMetricValue(item.usedPct, "%") : "--"}</td>
+                  <td className="px-4 py-2 text-slate-700">{item.status || "unknown"}</td>
+                  <td className="px-4 py-2 text-slate-600">{item.updatedAt || "--"}</td>
                 </tr>
               ))}
             </tbody>
@@ -396,15 +396,15 @@ function RoutingPanel({ routing }: { routing: DeviceDashboardResponse["routing"]
     return (a.destination || "").localeCompare(b.destination || "");
   });
   return (
-    <div className="border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-        <p className="text-xs font-semibold text-slate-700">Routing</p>
-        <p className="mt-0.5 text-[11px] text-slate-500">Source: {routing.source || "--"}</p>
+    <div className="border border-slate-300 bg-white shadow-sm">
+      <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+        <p className="text-xs font-semibold text-slate-800">Routing</p>
+        <p className="mt-0.5 text-[11px] text-slate-600">Source: {routing.source || "--"}</p>
       </div>
-      {!hasRoutes ? <p className="px-4 py-5 text-xs text-slate-500">No route metadata available.</p> : null}
+      {!hasRoutes ? <p className="px-4 py-5 text-xs text-slate-600">No route metadata available.</p> : null}
       {hasRoutes ? (
         <>
-          <div className="grid gap-3 border-b border-slate-100 bg-slate-50/50 p-4 md:grid-cols-3 xl:grid-cols-6">
+          <div className="grid gap-3 border-b border-slate-200 bg-slate-100/70 p-4 md:grid-cols-3 xl:grid-cols-6">
             <InfoCell label="Default Gateway" value={routing.defaultRoute?.nextHop || "--"} />
             <InfoCell label="Default Interface" value={routing.defaultRoute?.interfaceName || routing.defaultRoute?.interfaceId || "--"} />
             <InfoCell label="Routes" value={routing.summary.routeCount ?? routing.routes.length} />
@@ -415,24 +415,24 @@ function RoutingPanel({ routing }: { routing: DeviceDashboardResponse["routing"]
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="px-4 py-2 font-medium text-slate-500">Destination</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Next Hop</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Interface</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Protocol</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Type</th>
-                  <th className="px-4 py-2 font-medium text-slate-500">Flag</th>
+                <tr className="border-b border-slate-300 bg-slate-100/80">
+                  <th className="px-4 py-2 font-semibold text-slate-700">Destination</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Next Hop</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Interface</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Protocol</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Type</th>
+                  <th className="px-4 py-2 font-semibold text-slate-700">Flag</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-200">
                 {sortedRoutes.map((route, index) => (
-                  <tr key={`route-${route.destination}-${index}`} className={route.isDefault ? "bg-blue-50/30" : ""}>
+                  <tr key={`route-${route.destination}-${index}`} className={route.isDefault ? "bg-blue-50/50" : ""}>
                     <td className="px-4 py-2 font-mono text-[11px] font-medium text-slate-950">{route.destination || "--"}</td>
                     <td className="px-4 py-2 font-mono text-[11px] text-slate-700">{route.nextHop || "--"}</td>
-                    <td className="px-4 py-2 text-slate-600">{route.interfaceName || route.interfaceId || "--"}</td>
-                    <td className="px-4 py-2">{route.protocol ? <span className="bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">{route.protocol}</span> : "--"}</td>
-                    <td className="px-4 py-2">{route.routeType ? <span className="bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">{route.routeType}</span> : "--"}</td>
-                    <td className="px-4 py-2">{route.isDefault ? <span className="bg-blue-100 px-1.5 py-0.5 text-[11px] font-medium text-blue-700">Default</span> : route.routeType === "connected" ? <span className="bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-700">Connected</span> : route.routeType ? <span className="bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">Remote</span> : "--"}</td>
+                    <td className="px-4 py-2 text-slate-700">{route.interfaceName || route.interfaceId || "--"}</td>
+                    <td className="px-4 py-2">{route.protocol ? <span className="border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700">{route.protocol}</span> : "--"}</td>
+                    <td className="px-4 py-2">{route.routeType ? <span className="border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700">{route.routeType}</span> : "--"}</td>
+                    <td className="px-4 py-2">{route.isDefault ? <span className="border border-blue-200 bg-blue-100 px-1.5 py-0.5 text-[11px] font-medium text-blue-800">Default</span> : route.routeType === "connected" ? <span className="border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">Connected</span> : route.routeType ? <span className="border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-700">Remote</span> : "--"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -451,5 +451,5 @@ function routeSortKey(route: DashboardRoute) {
 }
 
 function InfoCell({ label, value }: { label: string; value: string | number }) {
-  return <div><p className="text-[11px] text-slate-500">{label}</p><p className="mt-0.5 text-xs font-semibold text-slate-950">{value}</p></div>;
+  return <div><p className="text-[11px] text-slate-600">{label}</p><p className="mt-0.5 text-xs font-semibold text-slate-950">{value}</p></div>;
 }

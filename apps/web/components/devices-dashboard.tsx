@@ -27,13 +27,13 @@ export function DevicesDashboard() {
         <StatCard title="Stale" value={summaryQuery.data?.summary.staleDeviceCount ?? 0} note="Telemetry older than 5 min" status={summaryQuery.data?.summary.staleDeviceCount ? "warning" : "normal"} />
       </section>
 
-      <section className="border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-          <p className="text-xs font-semibold text-slate-700">Device Inventory</p>
-          <p className="mt-0.5 text-[11px] text-slate-500">Select a device to view operational metrics and charts.</p>
+      <section className="border border-slate-300 bg-white shadow-sm">
+        <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+          <p className="text-xs font-semibold text-slate-800">Device Inventory</p>
+          <p className="mt-0.5 text-[11px] text-slate-600">Select a device to view operational metrics and charts.</p>
         </div>
-        {devicesQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-500">Loading devices...</p> : null}
-        <div className="divide-y divide-slate-100">
+        {devicesQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-600">Loading devices...</p> : null}
+        <div className="divide-y divide-slate-200">
           {devices.map((device) => (
             <DeviceLink key={device.deviceId} href={`/devices/${device.deviceId}${device.siteKey ? `?site=${device.siteKey}` : ""}`} name={device.name} type={`${device.type}${device.siteKey ? ` · ${device.siteKey}` : ""}`} status={device.health} />
           ))}
