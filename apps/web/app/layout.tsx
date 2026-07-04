@@ -12,6 +12,11 @@ const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700
 export const metadata: Metadata = {
   title: "NMS Dashboard",
   description: "Professional NMS dashboard for ThingsBoard-backed operations.",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

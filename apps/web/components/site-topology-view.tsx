@@ -269,16 +269,15 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
     const sides = edgeDir(from, to);
     const a = getAnchor(from, sides.fromSide);
     const b = getAnchor(to, sides.toSide);
-    const dy = Math.abs(b.y - a.y);
-    const dx = Math.abs(b.x - a.x);
-    if (sides.fromSide === "bottom" || sides.fromSide === "top") {
-      const curve = Math.min(dy * 0.4, 24);
-      const s = b.y > a.y ? 1 : -1;
-      return `M${a.x} ${a.y} C${a.x} ${a.y + s * curve},${b.x} ${b.y - s * curve},${b.x} ${b.y}`;
+    if (a.x === b.x || a.y === b.y) {
+      return `M${a.x} ${a.y} L${b.x} ${b.y}`;
     }
-    const curve = Math.min(dx * 0.4, 24);
-    const s = b.x > a.x ? 1 : -1;
-    return `M${a.x} ${a.y} C${a.x + s * curve} ${a.y},${b.x - s * curve} ${b.y},${b.x} ${b.y}`;
+    if (sides.fromSide === "bottom" || sides.fromSide === "top") {
+      const midY = a.y + (b.y - a.y) / 2;
+      return `M${a.x} ${a.y} L${a.x} ${midY} L${b.x} ${midY} L${b.x} ${b.y}`;
+    }
+    const midX = a.x + (b.x - a.x) / 2;
+    return `M${a.x} ${a.y} L${midX} ${a.y} L${midX} ${b.y} L${b.x} ${b.y}`;
   }
 
   // Zoom/fit
@@ -338,6 +337,7 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
   // Edges to render (skip next_hop_match in main canvas)
   const displayedEdges = filteredEdges.filter((e) => e.reason !== "next_hop_match");
 
+  const routerIcon = "M3 6h10M5 10h6M4 4h8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1ZM6 13v2M10 13v2";
   // Subnet icon SVG path (simple node-like)
   const subnetIcon = "M2 6h12M2 6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2M2 6v4a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6M6 12v4M14 12v4";
 
@@ -353,9 +353,9 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
     <div className="border border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-1.5">
         <div className="flex items-center gap-3 text-[11px] text-slate-500">
-          <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 border border-blue-400 bg-blue-50" />Router</span>
-          <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 border border-slate-300 bg-white" />Server</span>
-          <span className="inline-flex items-center gap-1"><span className="inline-block h-2 w-5 border border-slate-400 bg-white" />Subnet</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-flex h-3.5 w-3.5 items-center justify-center border border-blue-400 bg-blue-50 text-blue-700"><svg viewBox="0 0 16 16" className="h-2.5 w-2.5 fill-none"><path d={routerIcon} stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg></span>Router</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-flex h-3.5 w-3.5 items-center justify-center border border-slate-300 bg-white text-slate-600"><svg viewBox="0 0 16 16" className="h-2.5 w-2.5 fill-none"><rect x="3" y="2.5" width="10" height="11" rx="1" stroke="currentColor" strokeWidth="1.2" /><path d="M5 5.5h6M5 8h6M5 10.5h6" stroke="currentColor" strokeWidth="1" strokeLinecap="round" /></svg></span>Server</span>
+          <span className="inline-flex items-center gap-1"><span className="inline-flex h-3.5 w-5 items-center justify-center border border-slate-400 bg-white text-slate-700"><svg viewBox="0 0 16 16" className="h-2.5 w-3.5 fill-none"><path d={subnetIcon} stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" /></svg></span>Subnet</span>
           <span className="inline-flex items-center gap-1"><span className="inline-block h-3 w-3 border border-dashed border-slate-400 bg-slate-50" />External</span>
           <span className="text-slate-300">|</span>
           <span className="inline-flex items-center gap-1"><span className="inline-block h-px w-4 bg-slate-400" />Connected</span>
@@ -430,7 +430,8 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
             return (
               <g key={n.id}>
                 <rect x={p.x} y={p.y} width={ROUTER_W} height={NODE_H} rx={0} fill="#eff6ff" stroke="#93c5fd" strokeWidth={1.5} />
-                <text x={p.x + ROUTER_W / 2} y={p.y + NODE_H / 2 + 1} textAnchor="middle" fill="#1e40af" fontSize={11} fontWeight={600}>{trimNodeName(n.name)}</text>
+                <path d={routerIcon} transform={`translate(${p.x + 10} ${p.y + 6})`} fill="none" stroke="#1d4ed8" strokeWidth={1.2} strokeLinecap="round" strokeLinejoin="round" />
+                <text x={p.x + ROUTER_W / 2 + 8} y={p.y + NODE_H / 2 + 1} textAnchor="middle" fill="#1e40af" fontSize={11} fontWeight={600}>{trimNodeName(n.name)}</text>
               </g>
             );
           })}
@@ -442,7 +443,8 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
             return (
               <g key={n.id}>
                 <rect x={p.x} y={p.y} width={SUBNET_W} height={NODE_H} rx={0} fill="#fafafa" stroke="#cbd5e1" strokeWidth={1} />
-                <text x={p.x + 10} y={p.y + NODE_H / 2 + 1} textAnchor="start" fill="#334155" fontSize={9} fontWeight={500}>{trimNodeName(n.name, 24)}</text>
+                <path d={subnetIcon} transform={`translate(${p.x + 8} ${p.y + 6})`} fill="none" stroke="#475569" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
+                <text x={p.x + 28} y={p.y + NODE_H / 2 + 1} textAnchor="start" fill="#334155" fontSize={9} fontWeight={500}>{trimNodeName(n.name, 22)}</text>
               </g>
             );
           })}
