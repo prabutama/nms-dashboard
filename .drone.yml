@@ -162,7 +162,7 @@ steps:
               -i /tmp/nms-dashboard-deploy-key \
               "$DEPLOY_USER@$DEPLOY_HOST" \
               "chmod +x /opt/nms-dashboard/deploy-prod.sh &&
-               /opt/nms-dashboard/deploy-prod.sh \"$DRONE_COMMIT_SHA\""
+               sudo /opt/nms-dashboard/deploy-prod.sh \"$DRONE_COMMIT_SHA\""
 
             rm -f /tmp/nms-dashboard-deploy-key
           '
