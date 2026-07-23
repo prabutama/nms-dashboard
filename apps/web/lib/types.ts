@@ -36,6 +36,7 @@ export type DeviceDetail = {
   type: string;
   label?: string;
   profile?: string;
+  ipAddress?: string;
 };
 
 export type DeviceSummary = DeviceDetail & {

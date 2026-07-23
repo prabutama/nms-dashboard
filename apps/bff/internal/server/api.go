@@ -1318,17 +1318,25 @@ func (s *apiServer) deviceDashboardHandler() http.HandlerFunc {
 		}
 
 		attributes := make([]nms.AttributeValue, 0)
+		attributesByScope := make(map[string][]nms.AttributeValue, 3)
 		for _, scope := range []string{"SERVER_SCOPE", "CLIENT_SCOPE", "SHARED_SCOPE"} {
 			scopeAttributes, err := s.tbGetEntityAttributes(r.Context(), "DEVICE", deviceID, scope, nil)
 			if err != nil {
 				s.logger.Warn("load dashboard attributes failed", "deviceId", deviceID, "scope", scope, "error", err)
 				continue
 			}
-			attributes = append(attributes, normalizeAttributes(scopeAttributes)...)
+			normalized := normalizeAttributes(scopeAttributes)
+			attributesByScope[scope] = normalized
+			attributes = append(attributes, normalized...)
 		}
 
 		latestTelemetry := normalizeTelemetry(telemetry)
 		dashboard := buildDeviceDashboard(device, latestTelemetry, attributes)
+		dashboard.Device.IPAddress = firstNonEmpty(
+			firstNonEmptyAttributeValue(attributesByScope["CLIENT_SCOPE"], "ip_address"),
+			firstNonEmptyAttributeValue(attributesByScope["SERVER_SCOPE"], "ip_address"),
+			firstNonEmptyAttributeValue(attributesByScope["SHARED_SCOPE"], "ip_address"),
+		)
 		message := "Device dashboard loaded from ThingsBoard"
 		if len(latestTelemetry) == 0 {
 			message = "Device dashboard loaded, but no latest telemetry was found"
@@ -2013,11 +2021,12 @@ func buildDeviceDashboard(device thingsboard.Device, telemetry []nms.TelemetryVa
 
 	return nms.DeviceDashboard{
 		Device: nms.DashboardDevice{
-			DeviceID: device.ID,
-			Name:     device.Name,
-			Label:    dashboardDeviceLabel(device, attributeMap),
-			Type:     device.Type,
-			Profile:  device.Asset,
+			DeviceID:  device.ID,
+			Name:      device.Name,
+			Label:     dashboardDeviceLabel(device, attributeMap),
+			Type:      device.Type,
+			Profile:   device.Asset,
+			IPAddress: dashboardDeviceIPAddress(attributeMap),
 		},
 		Health:       dashboardHealth(cards, telemetry, lastTelemetryTs),
 		MetricCards:  cards,
@@ -2044,6 +2053,27 @@ func dashboardDeviceLabel(device thingsboard.Device, attributes map[string]nms.A
 	}
 
 	return firstNonEmpty(device.Label, device.Name)
+}
+
+func dashboardDeviceIPAddress(attributes map[string]nms.AttributeValue) string {
+	attribute, ok := attributes["ip_address"]
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(attribute.Value))
+}
+
+func firstNonEmptyAttributeValue(attributes []nms.AttributeValue, key string) string {
+	for _, attribute := range attributes {
+		if attribute.Key != key {
+			continue
+		}
+		value := strings.TrimSpace(fmt.Sprint(attribute.Value))
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func buildMetricCards(telemetry []nms.TelemetryValue, catalog map[string]metricCatalogEntry, attributes map[string]nms.AttributeValue) []nms.DashboardMetricCard {

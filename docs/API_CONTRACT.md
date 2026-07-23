@@ -188,6 +188,8 @@ Example response:
 
 Returns normalized NMS dashboard model for one device. BFF combines ThingsBoard device detail, latest telemetry, device attributes, freshness, health, and metric catalog metadata.
 
+If device attribute `ip_address` exists, BFF exposes it as normalized `device.ipAddress` for frontend display. Raw attribute keys remain unchanged in ThingsBoard and raw attributes endpoints.
+
 Example response:
 
 ```json
@@ -197,7 +199,8 @@ Example response:
     "name": "linux-hq-server-2",
     "label": "HQ Linux App Server",
     "type": "server",
-    "profile": "Linux Server"
+    "profile": "Linux Server",
+    "ipAddress": "172.16.20.10"
   },
   "health": {
     "status": "normal",

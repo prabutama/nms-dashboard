@@ -146,8 +146,10 @@ func TestDeviceDashboardLoadedFromThingsBoard(t *testing.T) {
 			_, _ = w.Write([]byte(`{"snmp.host.cpu.load_pct":[{"ts":` + strconv.FormatInt(now, 10) + `,"value":91}],"icmp.reachable":[{"ts":` + strconv.FormatInt(now, 10) + `,"value":true}],"custom_metric":[{"ts":` + strconv.FormatInt(now, 10) + `,"value":42}],"snmp.if.idx2.rx_bps":[{"ts":` + strconv.FormatInt(now, 10) + `,"value":123456}],"snmp.storage.idx36.used_pct":[{"ts":` + strconv.FormatInt(now, 10) + `,"value":55}]}`))
 		case "/api/plugins/telemetry/DEVICE/device-1/values/attributes/SERVER_SCOPE":
 			_, _ = w.Write([]byte(`[{"key":"nmsIdentity","value":{"displayName":"HQ Linux App Server"},"lastUpdateTs":` + strconv.FormatInt(now, 10) + `},{"key":"nmsMetrics","value":[{"key":"custom_metric","label":"Custom Metric","unit":"items","group":"custom","order":5,"warn":40,"critical":90}],"lastUpdateTs":` + strconv.FormatInt(now, 10) + `},{"key":"snmp.if.idx2.name","value":"eth0","lastUpdateTs":` + strconv.FormatInt(now, 10) + `},{"key":"snmp.storage.idx36.type","value":"Fixed Disk","lastUpdateTs":` + strconv.FormatInt(now, 10) + `},{"key":"snmp.storage.idx36.description","value":"/","lastUpdateTs":` + strconv.FormatInt(now, 10) + `},{"key":"route.ipv4.snapshot","value":"{\"supported\":true,\"source\":\"snmp_ip_cidr_route_table\",\"collected_at\":\"2026-06-16T10:50:36Z\",\"route_count\":2,\"default_route_count\":1,\"connected_route_count\":1,\"remote_route_count\":1,\"changed\":false,\"routes\":[{\"destination\":\"0.0.0.0/0\",\"next_hop\":\"172.16.20.1\",\"interface_id\":\"2\",\"interface_name\":\"eth0\",\"protocol\":\"local\",\"route_type\":\"remote\",\"is_default\":true}]}","lastUpdateTs":` + strconv.FormatInt(now, 10) + `}]`))
-		case "/api/plugins/telemetry/DEVICE/device-1/values/attributes/CLIENT_SCOPE", "/api/plugins/telemetry/DEVICE/device-1/values/attributes/SHARED_SCOPE":
-			_, _ = w.Write([]byte(`[]`))
+		case "/api/plugins/telemetry/DEVICE/device-1/values/attributes/CLIENT_SCOPE":
+			_, _ = w.Write([]byte(`[{"key":"ip_address","value":"172.16.20.10","lastUpdateTs":` + strconv.FormatInt(now, 10) + `}]`))
+		case "/api/plugins/telemetry/DEVICE/device-1/values/attributes/SHARED_SCOPE":
+			_, _ = w.Write([]byte(`[{"key":"ip_address","value":"","lastUpdateTs":` + strconv.FormatInt(now, 10) + `}]`))
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
@@ -172,7 +174,7 @@ func TestDeviceDashboardLoadedFromThingsBoard(t *testing.T) {
 		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	body := res.Body.String()
-	for _, expected := range []string{`"label":"HQ Linux App Server"`, `"key":"snmp.host.cpu.load_pct"`, `"label":"CPU Usage"`, `"status":"critical"`, `"label":"Custom Metric"`, `"group":"custom"`, `"label":"eth0 RX Throughput"`, `"subgroup":"eth0"`, `"label":"/ Storage Usage"`, `"subgroup":"/"`, `"type":"Fixed Disk"`, `"source":"snmp_ip_cidr_route_table"`, `"nextHop":"172.16.20.1"`, `"interfaceName":"eth0"`, `"rawTelemetryCount":5`, `"rawAttributeCount":6`, `"name":"eth0"`, `"index":"2"`} {
+	for _, expected := range []string{`"label":"HQ Linux App Server"`, `"ipAddress":"172.16.20.10"`, `"key":"snmp.host.cpu.load_pct"`, `"label":"CPU Usage"`, `"status":"critical"`, `"label":"Custom Metric"`, `"group":"custom"`, `"label":"eth0 RX Throughput"`, `"subgroup":"eth0"`, `"label":"/ Storage Usage"`, `"subgroup":"/"`, `"type":"Fixed Disk"`, `"source":"snmp_ip_cidr_route_table"`, `"nextHop":"172.16.20.1"`, `"interfaceName":"eth0"`, `"rawTelemetryCount":5`, `"rawAttributeCount":8`, `"name":"eth0"`, `"index":"2"`} {
 		if !strings.Contains(body, expected) {
 			t.Fatalf("expected %s in dashboard response: %s", expected, body)
 		}

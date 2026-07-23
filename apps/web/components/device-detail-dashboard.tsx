@@ -82,6 +82,7 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
                   <span>Name: {dashboard.device.name || "--"}</span>
                   <span>Type: {dashboard.device.type || "--"}</span>
                   <span>Profile: {dashboard.device.profile || "--"}</span>
+                  <span>IP: {dashboard.device.ipAddress || "--"}</span>
                 </div>
               </div>
               <Link href="/devices" className="shrink-0 border border-slate-400 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-800 hover:bg-slate-100">All devices</Link>

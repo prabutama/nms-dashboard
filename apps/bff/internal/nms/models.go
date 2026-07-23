@@ -62,11 +62,12 @@ type AttributeValue struct {
 }
 
 type DashboardDevice struct {
-	DeviceID string `json:"deviceId"`
-	Name     string `json:"name"`
-	Label    string `json:"label"`
-	Type     string `json:"type"`
-	Profile  string `json:"profile,omitempty"`
+	DeviceID  string `json:"deviceId"`
+	Name      string `json:"name"`
+	Label     string `json:"label"`
+	Type      string `json:"type"`
+	Profile   string `json:"profile,omitempty"`
+	IPAddress string `json:"ipAddress,omitempty"`
 }
 
 type DashboardHealth struct {

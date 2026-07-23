@@ -1,0 +1,175 @@
+kind: pipeline
+type: docker
+name: nms-dashboard
+
+clone:
+  depth: 1
+
+volumes:
+  - name: docker-socket
+    host:
+      path: /var/run/docker.sock
+
+steps:
+  - name: validate-bff
+    image: golang:1.23-alpine
+    commands:
+      - cd apps/bff
+      - test -z "$(gofmt -l .)"
+      - go test ./...
+      - go vet ./...
+      - go build ./...
+
+  - name: validate-web
+    image: node:22-alpine
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: /api
+    commands:
+      - cd apps/web
+      - npm ci
+      - npm run lint
+      - npm run build
+
+  - name: publish-images
+    image: docker:27-cli
+    environment:
+      INFISICAL_DOMAIN:
+        from_secret: infisical_domain
+      INFISICAL_PROJECT_ID:
+        from_secret: infisical_project_id
+      INFISICAL_CLIENT_ID:
+        from_secret: infisical_client_id
+      INFISICAL_CLIENT_SECRET:
+        from_secret: infisical_client_secret
+    commands:
+      - apk add --no-cache bash wget
+      - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
+      - apk update
+      - apk add --no-cache infisical
+      - |
+
+        export INFISICAL_DISABLE_UPDATE_CHECK=true
+        export INFISICAL_TOKEN="$(
+        infisical login \
+          --domain="$INFISICAL_DOMAIN" \
+          --method=universal-auth \
+          --client-id="$INFISICAL_CLIENT_ID" \
+          --client-secret="$INFISICAL_CLIENT_SECRET" \
+          --silent \
+          --plain
+        )"
+      - |
+        infisical run \
+          --domain="$INFISICAL_DOMAIN" \
+          --projectId="$INFISICAL_PROJECT_ID" \
+          --env=prod \
+          --path=/ci \
+          -- sh -c '
+            set -eu
+
+            BFF_IMAGE="$DOCKERHUB_NAMESPACE/nms-dashboard-bff"
+            WEB_IMAGE="$DOCKERHUB_NAMESPACE/nms-dashboard-web"
+
+            echo "$DOCKERHUB_WRITE_TOKEN" |
+              docker login \
+                --username "$DOCKERHUB_USERNAME" \
+                --password-stdin
+
+            docker build \
+              -t "$BFF_IMAGE:$DRONE_COMMIT_SHA" \
+              -t "$BFF_IMAGE:latest" \
+              apps/bff
+
+            docker build \
+              --build-arg NEXT_PUBLIC_API_BASE_URL=/api \
+              -t "$WEB_IMAGE:$DRONE_COMMIT_SHA" \
+              -t "$WEB_IMAGE:latest" \
+              apps/web
+
+            docker push "$BFF_IMAGE:$DRONE_COMMIT_SHA"
+            docker push "$BFF_IMAGE:latest"
+
+            docker push "$WEB_IMAGE:$DRONE_COMMIT_SHA"
+            docker push "$WEB_IMAGE:latest"
+
+            docker logout
+          '
+    volumes:
+      - name: docker-socket
+        path: /var/run/docker.sock
+    depends_on:
+      - validate-bff
+      - validate-web
+    when:
+      event:
+        - push
+      branch:
+        - main
+
+  - name: deploy-production
+    image: alpine:3.20
+    environment:
+      INFISICAL_DOMAIN:
+        from_secret: infisical_domain
+      INFISICAL_PROJECT_ID:
+        from_secret: infisical_project_id
+      INFISICAL_CLIENT_ID:
+        from_secret: infisical_client_id
+      INFISICAL_CLIENT_SECRET:
+        from_secret: infisical_client_secret
+    commands:
+      - apk add --no-cache bash wget openssh-client
+      - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
+      - apk update
+      - apk add --no-cache infisical
+      - |
+        export INFISICAL_TOKEN="$(
+          infisical login \
+            --domain="$INFISICAL_DOMAIN" \
+            --method=universal-auth \
+            --client-id="$INFISICAL_CLIENT_ID" \
+            --client-secret="$INFISICAL_CLIENT_SECRET" \
+            --silent \
+            --plain
+        )"
+      - |
+        infisical run \
+          --domain="$INFISICAL_DOMAIN" \
+          --projectId="$INFISICAL_PROJECT_ID" \
+          --env=prod \
+          --path=/ci \
+          -- sh -eu -c '
+            mkdir -p "$HOME/.ssh"
+            chmod 700 "$HOME/.ssh"
+
+            printf "%s\n" "$DEPLOY_KNOWN_HOSTS" \
+              > "$HOME/.ssh/known_hosts"
+            chmod 600 "$HOME/.ssh/known_hosts"
+
+            printf "%s\n" "$DEPLOY_SSH_PRIVATE_KEY" \
+              > /tmp/nms-dashboard-deploy-key
+            chmod 600 /tmp/nms-dashboard-deploy-key
+
+            scp \
+              -P "${DEPLOY_PORT:-22}" \
+              -i /tmp/nms-dashboard-deploy-key \
+              deploy/docker-compose.prod.yml \
+              deploy/deploy-prod.sh \
+              "$DEPLOY_USER@$DEPLOY_HOST:/opt/nms-dashboard/"
+
+            ssh \
+              -p "${DEPLOY_PORT:-22}" \
+              -i /tmp/nms-dashboard-deploy-key \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "chmod +x /opt/nms-dashboard/deploy-prod.sh &&
+               /opt/nms-dashboard/deploy-prod.sh \"$DRONE_COMMIT_SHA\""
+
+            rm -f /tmp/nms-dashboard-deploy-key
+          '
+    depends_on:
+      - publish-images
+    when:
+      event:
+        - push
+      branch:
+        - main

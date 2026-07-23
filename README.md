@@ -190,7 +190,7 @@ For servers that already run:
 
 * `postgres`
 * `tb-core`
-* `nginx`
+* Cloudflare Tunnel
 
 and expose ThingsBoard on:
 
@@ -203,11 +203,11 @@ recommended split is:
 
 ### Production-facing files
 
-Use these templates:
+CI/CD deployment uses these files:
 
-* `deploy/docker-compose.server-example.yml`
-* `deploy/server.env.example`
-* `deploy/nginx/dashboard.conf.example`
+* `deploy/docker-compose.prod.yml` — production runtime services from Docker Hub images
+* `deploy/deploy-prod.sh` — server-side deploy, health check, and rollback script
+* `deploy/infisical-auth.env.example` — example server auth file for Infisical Universal Auth
 
 ### Production env guidance
 
@@ -217,7 +217,7 @@ Use these templates:
 THINGSBOARD_BASE_URL=http://tb-core:8080
 ```
 
-`nms-web` should use same-origin API routing through nginx:
+`nms-web` should use same-origin API routing through Cloudflare Tunnel:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=/api
@@ -225,18 +225,51 @@ NEXT_PUBLIC_API_BASE_URL=/api
 
 ### Recommended production routing
 
-* `https://dash.prabutama.my.id/` -> `nms-web:3000`
-* `https://dash.prabutama.my.id/api/` -> `nms-bff:8080`
+* `https://dash.prabutama.my.id/` -> `http://127.0.0.1:3001`
+* `https://dash.prabutama.my.id/api/` -> `http://127.0.0.1:8080`
+* `https://nms.prabutama.my.id/` -> `http://127.0.0.1:8081`
 
 ### Suggested rollout
 
 1. Create DNS for `dash.prabutama.my.id`
 2. Ensure TLS certificate covers `dash.prabutama.my.id`
-3. Copy `deploy/server.env.example` to your server-side env file and fill secrets
-4. Add `deploy/nginx/dashboard.conf.example` as a real nginx vhost
-5. Deploy `nms-bff` and `nms-web` with `deploy/docker-compose.server-example.yml`
-6. Validate dashboard login, sites, devices, alarms, and customer scoping
+3. Create `/opt/nms-dashboard` on the server
+4. Create `/etc/nms-dashboard/infisical-auth.env` from `deploy/infisical-auth.env.example`
+5. Ensure Docker, Docker Compose, and Infisical CLI are installed on the server
+6. Ensure external Docker network from `NMS_DOCKER_NETWORK` exists
+7. Configure Cloudflare Tunnel to route `/` to `127.0.0.1:3001` and `/api/` to `127.0.0.1:8080`
+8. Let Drone copy `docker-compose.prod.yml` and `deploy-prod.sh`, then run production deploy
+9. Validate dashboard login, sites, devices, alarms, and customer scoping
 * `THINGSBOARD_API_KEY` stays runtime-only and is not baked into images.
+
+### Infisical runtime secrets
+
+Drone reads deploy/build values from Infisical `/ci`:
+
+```env
+DOCKERHUB_NAMESPACE=
+DOCKERHUB_USERNAME=
+DOCKERHUB_WRITE_TOKEN=
+DEPLOY_HOST=
+DEPLOY_PORT=22
+DEPLOY_USER=
+DEPLOY_SSH_PRIVATE_KEY=
+DEPLOY_KNOWN_HOSTS=
+```
+
+Production runtime values live in Infisical `/runtime`:
+
+```env
+DOCKERHUB_USERNAME=
+DOCKERHUB_READ_TOKEN=
+DOCKERHUB_NAMESPACE=
+NMS_DOCKER_NETWORK=
+THINGSBOARD_BASE_URL=http://tb-core:8080
+THINGSBOARD_API_KEY=
+THINGSBOARD_SITE_ASSET_TYPE=site
+CACHE_TTL_SECONDS=30
+CORS_ALLOWED_ORIGINS=https://dash.prabutama.my.id
+```
 
 ### Example `deploy/.env`
 
