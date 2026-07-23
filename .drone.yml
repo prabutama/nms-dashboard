@@ -23,7 +23,7 @@ steps:
   - name: validate-web
     image: node:22-alpine
     environment:
-      NEXT_PUBLIC_API_BASE_URL: /api
+      NEXT_PUBLIC_API_BASE_URL: ""
     commands:
       - cd apps/web
       - npm ci
@@ -81,7 +81,7 @@ steps:
               apps/bff
 
             docker build \
-              --build-arg NEXT_PUBLIC_API_BASE_URL=/api \
+              --build-arg NEXT_PUBLIC_API_BASE_URL= \
               -t "$WEB_IMAGE:$DRONE_COMMIT_SHA" \
               -t "$WEB_IMAGE:latest" \
               apps/web
