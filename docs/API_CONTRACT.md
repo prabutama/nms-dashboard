@@ -432,7 +432,7 @@ If config is missing:
 
 ### Frontend
 
-* `NEXT_PUBLIC_API_BASE_URL`: BFF base URL. Default `http://localhost:8080`.
+* `NEXT_PUBLIC_API_BASE_URL`: BFF base URL. Local development uses `http://localhost:8080`. Production Cloudflare Tunnel leaves it empty so browser requests use same-origin `/api/v1/...` routes.
 
 ### `GET /api/v1/sites/{siteKey}/topology`
 

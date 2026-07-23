@@ -181,6 +181,7 @@ BFF: `http://localhost:8080`
 ## Container notes
 
 * `NEXT_PUBLIC_API_BASE_URL` must be browser-visible. For local Docker Compose keep `http://localhost:8080`.
+* For production Cloudflare Tunnel, leave `NEXT_PUBLIC_API_BASE_URL` empty so requests stay same-origin.
 * Do not set `NEXT_PUBLIC_API_BASE_URL` to Docker internal names such as `http://nms-bff:8080` for browser use.
 * Docker Compose reads runtime values from `deploy/.env`.
 
@@ -217,10 +218,10 @@ CI/CD deployment uses these files:
 THINGSBOARD_BASE_URL=http://tb-core:8080
 ```
 
-`nms-web` should use same-origin API routing through Cloudflare Tunnel:
+`nms-web` should use same-origin API routing through Cloudflare Tunnel. Leave the public API base empty so browser requests use `/api/v1/...` on the current origin:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=/api
+NEXT_PUBLIC_API_BASE_URL=
 ```
 
 ### Recommended production routing
