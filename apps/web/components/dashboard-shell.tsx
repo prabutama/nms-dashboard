@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Activity, Bell, ChevronLeft, ChevronRight, Database, FileText, Home, Map, Menu, Server, Settings, X } from "lucide-react";
-
-import { useAuth } from "@/components/auth-provider";
+import { usePathname } from "next/navigation";
+import { Activity, Bell, ChevronLeft, ChevronRight, Database, FileText, Home, Map, Menu, Server, X } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Overview", icon: Home },
@@ -13,13 +11,10 @@ const navItems = [
   { href: "/devices", label: "Devices", icon: Server },
   { href: "/alarms", label: "Alarms", icon: Bell },
   { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/settings", label: "Settings", icon: Settings, adminOnly: true },
 ];
 
 export function DashboardShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, isAuthenticated, logout, ready } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -27,14 +22,8 @@ export function DashboardShell({ title, subtitle, children }: { title: string; s
     setMobileOpen(false);
   }, [pathname]);
 
-  if (ready && !isAuthenticated) {
-    router.replace("/login");
-    return null;
-  }
-
   const sidebarWidthClass = collapsed ? "lg:w-[72px]" : "lg:w-[260px]";
   const contentOffsetClass = collapsed ? "lg:pl-[72px]" : "lg:pl-[260px]";
-  const visibleNavItems = navItems.filter((item) => !item.adminOnly || user?.authority === "TENANT_ADMIN" || user?.authority === "SYS_ADMIN");
 
   return (
     <div className="min-h-screen bg-slate-100">
@@ -71,7 +60,7 @@ export function DashboardShell({ title, subtitle, children }: { title: string; s
           </div>
 
           <nav className="flex-1 space-y-1 px-3 py-4">
-            {visibleNavItems.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon;
               const selected = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               return (
@@ -89,21 +78,10 @@ export function DashboardShell({ title, subtitle, children }: { title: string; s
           </nav>
 
           <div className={`border-t border-slate-300 py-4 ${collapsed ? "px-3" : "px-5"}`}>
-            {isAuthenticated && user ? (
-              <div className={`space-y-2 ${collapsed ? "flex flex-col items-center" : ""}`}>
-                <div className={collapsed ? "text-center" : ""}>
-                  <p className="text-[11px] font-semibold text-slate-800" title={user.firstName || user.email}>{collapsed ? (user.firstName || user.email).slice(0, 1).toUpperCase() : user.firstName || user.email}</p>
-                  {!collapsed ? <p className="mt-1 text-[11px] text-slate-600">{user.authority}</p> : null}
-                </div>
-                <button type="button" onClick={() => void logout()} title="Logout" className={`border border-slate-400 bg-white text-[11px] font-medium text-slate-800 hover:bg-slate-100 ${collapsed ? "px-2 py-1" : "px-2.5 py-1"}`}>Logout</button>
-              </div>
-            ) : (
-              <div className={`space-y-2 ${collapsed ? "flex flex-col items-center" : ""}`}>
-                <p className="text-[11px] font-semibold text-slate-800">{collapsed ? "G" : "Guest"}</p>
-                {!collapsed ? <p className="mt-1 text-[11px] text-slate-600">Sign in with ThingsBoard user.</p> : null}
-                <Link href="/login" title="Login" className="inline-flex border border-blue-800 bg-blue-700 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-blue-800">Login</Link>
-              </div>
-            )}
+            <div className={`space-y-2 ${collapsed ? "flex flex-col items-center text-center" : ""}`}>
+              <p className="text-[11px] font-semibold text-slate-800">{collapsed ? "RO" : "Public Demo"}</p>
+              {!collapsed ? <p className="mt-1 text-[11px] text-slate-600">Read-only portfolio access.</p> : null}
+            </div>
           </div>
         </div>
       </aside>

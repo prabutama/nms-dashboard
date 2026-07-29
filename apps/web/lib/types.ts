@@ -104,21 +104,6 @@ export type DeviceSummaryResponse = {
   message?: string;
 };
 
-export type AttributeValue = {
-  key: string;
-  value: unknown;
-  valueType: string;
-  lastUpdateTs: number;
-};
-
-export type AttributesResponse = {
-  entityType: string;
-  entityId: string;
-  scopes: Record<string, AttributeValue[]>;
-  source?: string;
-  message?: string;
-};
-
 export type DashboardHealth = {
   status: "normal" | "warning" | "critical" | "unknown" | string;
   reachable: boolean;
@@ -242,24 +227,6 @@ export type AlarmActionResponse = {
   action: string;
   alarmId: string;
   alarm: Alarm;
-  source?: string;
-  message?: string;
-};
-
-export type AuthUser = {
-  id: string;
-  email: string;
-  authority: string;
-  firstName?: string;
-  lastName?: string;
-  customerId?: string;
-  tenantId?: string;
-};
-
-export type AuthResponse = {
-  user: AuthUser;
-  token?: string;
-  refreshToken?: string;
   source?: string;
   message?: string;
 };

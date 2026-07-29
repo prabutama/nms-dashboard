@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
-import { useAuth } from "@/components/auth-provider";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { DeviceLink, StatCard, StatusBadge } from "@/components/nms-ui";
-import { fetchAttributes, fetchReportDevices, fetchSiteAlarms, fetchSiteDevices, fetchSites, fetchSiteTopology } from "@/lib/api";
+import { fetchReportDevices, fetchSiteAlarms, fetchSiteDevices, fetchSites, fetchSiteTopology } from "@/lib/api";
 
 function tsDisplay(ts?: string) {
   if (!ts) return "-";
@@ -14,18 +13,10 @@ function tsDisplay(ts?: string) {
 }
 
 export function SiteDetailDashboard({ siteKey }: { siteKey: string }) {
-  const { user } = useAuth();
-  const canReadDebug = user?.authority === "TENANT_ADMIN" || user?.authority === "SYS_ADMIN";
   const sitesQuery = useQuery({ queryKey: ["sites"], queryFn: fetchSites, refetchInterval: 60_000 });
   const devicesQuery = useQuery({ queryKey: ["site-devices", siteKey], queryFn: () => fetchSiteDevices(siteKey), refetchInterval: 60_000 });
   const reportDevicesQuery = useQuery({ queryKey: ["report-devices", "24h", siteKey], queryFn: () => fetchReportDevices("24h", siteKey), refetchInterval: 60_000 });
   const site = sitesQuery.data?.items.find((item) => item.siteKey === siteKey);
-  const attributesQuery = useQuery({
-    queryKey: ["site-attributes", site?.assetId],
-    queryFn: () => fetchAttributes("assets", site?.assetId as string),
-    enabled: site?.assetId !== undefined,
-    refetchInterval: 60_000,
-  });
   const topologyQuery = useQuery({
     queryKey: ["site-topology", siteKey],
     queryFn: () => fetchSiteTopology(siteKey),
@@ -60,7 +51,7 @@ export function SiteDetailDashboard({ siteKey }: { siteKey: string }) {
         <StatCard title="Devices" value={devicesQuery.data?.items.length || 0} note="Related to site" />
         <StatCard title="Health" value={activeAlarmCount > 0 ? "Alarms" : "Normal"} note={activeAlarmCount > 0 ? `${activeAlarmCount} active` : "No active alarms"} status={alarmBadge} />
         <StatCard title="Active Alarms" value={activeAlarmCount} note="Across site devices" status={alarmBadge} />
-        <StatCard title="Attributes" value={attributeCount(attributesQuery.data)} note="Site metadata entries" />
+        <StatCard title="Access" value="Read Only" note="Public portfolio mode" status="unknown" />
       </div>
 
       <div className="border border-slate-300 bg-white shadow-sm">
@@ -136,19 +127,6 @@ export function SiteDetailDashboard({ siteKey }: { siteKey: string }) {
         </div>
       ) : null}
 
-      {canReadDebug ? (
-      <details className="border border-slate-300 bg-white shadow-sm">
-        <summary className="cursor-pointer bg-slate-100 px-4 py-3 text-xs font-semibold text-slate-800">Advanced / Debug: site attributes</summary>
-        <pre className="max-h-96 overflow-auto bg-slate-100 px-4 py-4 text-xs text-slate-700">{JSON.stringify(attributesQuery.data || {}, null, 2)}</pre>
-      </details>
-      ) : null}
     </DashboardShell>
   );
-}
-
-function attributeCount(data: Awaited<ReturnType<typeof fetchAttributes>> | undefined) {
-  if (!data) {
-    return 0;
-  }
-  return Object.values(data.scopes).reduce((sum, items) => sum + items.length, 0);
 }

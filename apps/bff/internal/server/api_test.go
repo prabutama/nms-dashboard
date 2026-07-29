@@ -121,8 +121,8 @@ func TestDeviceDashboardNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("unexpected dashboard placeholder response: %s", res.Body.String())
@@ -219,8 +219,8 @@ func TestSitesPlaceholderWhenThingsBoardNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("unexpected placeholder response: %s", res.Body.String())
@@ -306,22 +306,18 @@ func TestSitesLoadedFromThingsBoard(t *testing.T) {
 	}
 }
 
-func TestSitesCustomerUserUsesCustomerAssetsEndpoint(t *testing.T) {
+func TestSitesPublicModeUsesTenantAssetsEndpoint(t *testing.T) {
 	t.Parallel()
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if requireBearerUser(t, w, r) {
-			return
-		}
-
 		switch {
-		case r.URL.Path == "/api/customer/customer-1/assets":
+		case r.URL.Path == "/api/tenant/assets":
 			_, _ = w.Write([]byte(`{"data":[{"id":{"entityType":"ASSET","id":"asset-1"},"name":"HQ","type":"site"}],"hasNext":false}`))
 		case r.URL.Path == "/api/plugins/telemetry/ASSET/asset-1/values/attributes":
 			_, _ = w.Write([]byte(`[]`))
-		case r.URL.Path == "/api/tenant/assets":
-			t.Fatalf("customer user should not call tenant assets endpoint")
+		case r.URL.Path == "/api/customer/customer-1/assets":
+			t.Fatalf("public mode should not call customer assets endpoint")
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
 		}
@@ -338,7 +334,7 @@ func TestSitesCustomerUserUsesCustomerAssetsEndpoint(t *testing.T) {
 		HasThingsBoardSetup: true,
 	}, slog.New(slog.NewJSONHandler(io.Discard, nil)))
 
-	req := authedRequest(http.MethodGet, "/api/v1/sites")
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sites", nil)
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
@@ -430,8 +426,8 @@ func TestSiteDevicesNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("unexpected not configured response: %s", res.Body.String())
@@ -543,8 +539,8 @@ func TestDeviceDetailNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("unexpected not configured response: %s", res.Body.String())
@@ -607,8 +603,8 @@ func TestLatestTelemetryNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("unexpected telemetry not configured response: %s", res.Body.String())
@@ -671,8 +667,8 @@ func TestDeviceSummaryNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("unexpected summary not configured response: %s", res.Body.String())
@@ -824,6 +820,7 @@ func TestTelemetryHistoryInfersNumericKeys(t *testing.T) {
 
 func TestDeviceAttributesLoadedFromThingsBoard(t *testing.T) {
 	t.Parallel()
+	t.Skip("raw device attributes are not exposed in public read-only mode")
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -869,6 +866,7 @@ func TestDeviceAttributesLoadedFromThingsBoard(t *testing.T) {
 
 func TestAssetAttributesLoadedFromThingsBoard(t *testing.T) {
 	t.Parallel()
+	t.Skip("raw asset attributes are not exposed in public read-only mode")
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -920,8 +918,8 @@ func TestAlarmsNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("unexpected alarms not configured response: %s", res.Body.String())
@@ -984,6 +982,7 @@ func TestAlarmsLoadedFromThingsBoard(t *testing.T) {
 
 func TestAlarmAckLoadedFromThingsBoard(t *testing.T) {
 	t.Parallel()
+	t.Skip("alarm write actions are not exposed in public read-only mode")
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1035,6 +1034,7 @@ func TestAlarmAckLoadedFromThingsBoard(t *testing.T) {
 
 func TestAlarmClearLoadedFromThingsBoard(t *testing.T) {
 	t.Parallel()
+	t.Skip("alarm write actions are not exposed in public read-only mode")
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1080,6 +1080,7 @@ func TestAlarmClearLoadedFromThingsBoard(t *testing.T) {
 
 func TestAlarmAckSucceedsWithEmptyThingsBoardBody(t *testing.T) {
 	t.Parallel()
+	t.Skip("alarm write actions are not exposed in public read-only mode")
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1125,6 +1126,7 @@ func TestAlarmAckSucceedsWithEmptyThingsBoardBody(t *testing.T) {
 
 func TestAlarmClearSucceedsWithEmptyThingsBoardBody(t *testing.T) {
 	t.Parallel()
+	t.Skip("alarm write actions are not exposed in public read-only mode")
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1167,6 +1169,7 @@ func TestAlarmClearSucceedsWithEmptyThingsBoardBody(t *testing.T) {
 
 func TestAlarmAckSucceedsWithPlainTextThingsBoardBody(t *testing.T) {
 	t.Parallel()
+	t.Skip("alarm write actions are not exposed in public read-only mode")
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
@@ -1210,6 +1213,7 @@ func TestAlarmAckSucceedsWithPlainTextThingsBoardBody(t *testing.T) {
 
 func TestAlarmClearSucceedsWithPlainTextThingsBoardBody(t *testing.T) {
 	t.Parallel()
+	t.Skip("alarm write actions are not exposed in public read-only mode")
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
@@ -1265,13 +1269,14 @@ func TestAlarmAckNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", res.Code)
 	}
 }
 
 func TestAuthLoginAndMe(t *testing.T) {
 	t.Parallel()
+	t.Skip("auth routes are not exposed in public read-only mode")
 
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1485,8 +1490,8 @@ func TestSiteTopologyNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("unexpected topology not configured response: %s", res.Body.String())
@@ -1591,8 +1596,8 @@ func TestSiteAlarmsNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("unexpected site alarms not configured response: %s", res.Body.String())
@@ -1616,11 +1621,11 @@ func TestAlarmsConfiguredButUnreachable(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusUnauthorized {
-		t.Fatalf("expected status 401, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
-	if !strings.Contains(res.Body.String(), `thingsboard request failed`) {
-		t.Fatalf("expected upstream auth failure: %s", res.Body.String())
+	if !strings.Contains(res.Body.String(), `alarms could not be loaded`) {
+		t.Fatalf("expected public fallback message: %s", res.Body.String())
 	}
 }
 
@@ -1637,8 +1642,8 @@ func TestReportSummaryNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("expected not configured message: %s", res.Body.String())
@@ -1658,8 +1663,8 @@ func TestReportSitesNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("expected not configured message: %s", res.Body.String())
@@ -1679,8 +1684,8 @@ func TestReportDevicesNotConfigured(t *testing.T) {
 	res := httptest.NewRecorder()
 	router.ServeHTTP(res, req)
 
-	if res.Code != http.StatusBadGateway {
-		t.Fatalf("expected status 502, got %d", res.Code)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", res.Code)
 	}
 	if !strings.Contains(res.Body.String(), `"ThingsBoard integration not configured"`) {
 		t.Fatalf("expected not configured message: %s", res.Body.String())

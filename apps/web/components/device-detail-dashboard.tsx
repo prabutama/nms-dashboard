@@ -4,11 +4,10 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { useAuth } from "@/components/auth-provider";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { MetricCard, StatCard, StatusBadge } from "@/components/nms-ui";
 import { TelemetryChart } from "@/components/telemetry-chart";
-import { fetchAttributes, fetchDeviceAlarms, fetchDeviceDashboard, fetchLatestTelemetry, fetchTelemetryHistory } from "@/lib/api";
+import { fetchDeviceAlarms, fetchDeviceDashboard, fetchTelemetryHistory } from "@/lib/api";
 import { formatBitrate, formatMetricValue } from "@/lib/format";
 import type { DashboardRoute, DeviceDashboardResponse } from "@/lib/types";
 
@@ -24,8 +23,6 @@ type ChartRange = (typeof CHART_RANGES)[number]["value"];
 export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
-  const canReadDebug = user?.authority === "TENANT_ADMIN" || user?.authority === "SYS_ADMIN";
   const range = normalizeChartRange(searchParams.get("range"));
   const dashboardQuery = useQuery({ queryKey: ["device-dashboard", deviceId], queryFn: () => fetchDeviceDashboard(deviceId), refetchInterval: 15_000 });
   const dashboard = dashboardQuery.data;
@@ -39,8 +36,6 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
     enabled: chartKeys.length > 0,
     refetchInterval: range === "7d" ? 60_000 : 30_000,
   });
-  const telemetryQuery = useQuery({ queryKey: ["latest-telemetry", deviceId], queryFn: () => fetchLatestTelemetry(deviceId), refetchInterval: 15_000 });
-  const attributesQuery = useQuery({ queryKey: ["device-attributes", deviceId], queryFn: () => fetchAttributes("devices", deviceId), refetchInterval: 60_000, enabled: canReadDebug });
   const alarmsQuery = useQuery({ queryKey: ["device-alarms", deviceId], queryFn: () => fetchDeviceAlarms(deviceId), refetchInterval: 15000 });
   const metricMeta = new Map(dashboard?.metricCards.map((metric) => [metric.key, metric]) || []);
   const visibleChartSeries = (historyQuery.data?.series || []).filter((series) => series.numeric && series.points.some((point) => point.numeric));
@@ -196,21 +191,6 @@ export function DeviceDetailDashboard({ deviceId }: { deviceId: string }) {
             ) : null}
           </div>
 
-          {canReadDebug ? (
-          <details className="border border-slate-300 bg-white shadow-sm">
-            <summary className="cursor-pointer bg-slate-100 px-4 py-3 text-xs font-semibold text-slate-800">Advanced / Debug</summary>
-            <div className="grid gap-4 p-4 xl:grid-cols-2">
-              <div>
-                <p className="text-xs font-semibold text-slate-800">Raw latest telemetry</p>
-                <pre className="mt-2 max-h-64 overflow-auto bg-slate-100 p-3 text-xs text-slate-700">{JSON.stringify(telemetryQuery.data || {}, null, 2)}</pre>
-              </div>
-              <div>
-                <p className="text-xs font-semibold text-slate-800">Raw device attributes</p>
-                <pre className="mt-2 max-h-64 overflow-auto bg-slate-100 p-3 text-xs text-slate-700">{JSON.stringify(attributesQuery.data || {}, null, 2)}</pre>
-              </div>
-            </div>
-          </details>
-          ) : null}
         </>
       ) : null}
     </DashboardShell>

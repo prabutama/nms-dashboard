@@ -11,7 +11,6 @@ import type {
   DeviceDetailResponse,
   DeviceDashboardResponse,
   DeviceSummaryResponse,
-  AttributesResponse,
   LatestTelemetryResponse,
   SiteDevicesResponse,
   SitesResponse,
@@ -168,27 +167,6 @@ async function fetchDeviceDashboard(deviceId: string): Promise<DeviceDashboardRe
   return response.json();
 }
 
-async function fetchAttributes(entityType: "assets" | "devices", entityId: string): Promise<AttributesResponse> {
-  let response: Response;
-
-  try {
-    response = await fetch(`${getApiBaseUrl()}/api/v1/${entityType}/${entityId}/attributes`, {
-      headers: {
-        Accept: "application/json",
-      },
-      cache: "no-store",
-    });
-  } catch {
-    throw new Error(`Network error. Cannot reach BFF at ${getApiBaseUrl()}.`);
-  }
-
-  if (!response.ok) {
-    throw new Error(`BFF returned status ${response.status} for ${entityType} attributes.`);
-  }
-
-  return response.json();
-}
-
 async function fetchTelemetryHistory(deviceId: string): Promise<TelemetryHistoryResponse> {
   let response: Response;
 
@@ -278,25 +256,6 @@ export function SiteListCard() {
 
   const selectedSite = data?.items.find((site) => site.siteKey === selectedSiteKey);
   const selectedDevice = devicesData?.items.find((device) => device.deviceId === selectedDeviceId);
-  const {
-    data: siteAttributesData,
-    error: siteAttributesError,
-    isLoading: isSiteAttributesLoading,
-  } = useQuery({
-    queryKey: ["site-attributes", selectedSite?.assetId],
-    queryFn: () => fetchAttributes("assets", selectedSite?.assetId as string),
-    enabled: selectedSite?.assetId !== undefined,
-  });
-  const {
-    data: deviceAttributesData,
-    error: deviceAttributesError,
-    isLoading: isDeviceAttributesLoading,
-  } = useQuery({
-    queryKey: ["device-attributes", selectedDeviceId],
-    queryFn: () => fetchAttributes("devices", selectedDeviceId as string),
-    enabled: selectedDeviceId !== null,
-  });
-
   const summaryFreshness = getFreshness(summaryData?.item?.lastTelemetryTs);
   const metricLabels = new Map(dashboardData?.metricCards.map((metric) => [metric.key, metric]) || []);
 
@@ -459,8 +418,7 @@ export function SiteListCard() {
                   {telemetryError ? <p className="text-rose-300">{telemetryError.message}</p> : null}
                   {isTelemetryLoading ? <p>Loading raw telemetry...</p> : null}
                   <RawTelemetryPanel data={telemetryData} />
-                  <AttributePanel title="Site Attributes" data={siteAttributesData} error={siteAttributesError} isLoading={isSiteAttributesLoading} />
-                  <AttributePanel title="Device Attributes" data={deviceAttributesData} error={deviceAttributesError} isLoading={isDeviceAttributesLoading} />
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-slate-400">Raw attributes are hidden in public read-only mode.</div>
                   {deviceDetailData?.source ? <p className="text-xs text-slate-400">device detail source: {deviceDetailData.source}</p> : null}
                 </div>
               </details>
@@ -613,64 +571,4 @@ function toneTextClass(tone: string) {
     default:
       return "text-slate-100";
   }
-}
-
-function AttributePanel({
-  title,
-  data,
-  error,
-  isLoading,
-}: {
-  title: string;
-  data?: AttributesResponse;
-  error: Error | null;
-  isLoading: boolean;
-}) {
-  const entries = data ? Object.entries(data.scopes) : [];
-
-  return (
-    <div className="mt-5 border-t border-white/10 pt-4">
-      <p className="text-xs uppercase tracking-[0.25em] text-purple-200">{title}</p>
-      {isLoading ? <p className="mt-3">Loading attributes...</p> : null}
-      {error ? <p className="mt-3 text-rose-300">{error.message}</p> : null}
-      {data && entries.length === 0 ? <p className="mt-3">{data.message || "No attributes returned."}</p> : null}
-      {entries.length > 0 ? (
-        <div className="mt-3 space-y-3">
-          {entries.map(([scope, attributes]) => (
-            <div key={scope} className="rounded-xl border border-white/10 bg-slate-950/50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">{scope}</p>
-              {attributes.length === 0 ? <p className="mt-2 text-sm text-slate-500">No attributes in this scope.</p> : null}
-              {attributes.length > 0 ? (
-                <div className="mt-3 grid gap-2 lg:grid-cols-2">
-                  {attributes.map((attribute) => (
-                    <div key={`${scope}-${attribute.key}`} className="rounded-lg border border-white/10 bg-white/5 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-semibold text-slate-50">{attribute.key}</p>
-                        <span className="rounded-full border border-slate-400/20 bg-slate-400/10 px-2 py-0.5 text-[11px] text-slate-300">
-                          {attribute.valueType}
-                        </span>
-                      </div>
-                      <pre className="mt-2 max-h-36 overflow-auto whitespace-pre-wrap break-words text-xs text-slate-300">
-                        {formatAttributeValue(attribute.value)}
-                      </pre>
-                      <p className="mt-2 text-xs text-slate-500">{formatAge(attribute.lastUpdateTs)}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : null}
-      {data?.source ? <p className="mt-3 text-xs text-slate-400">source: {data.source}</p> : null}
-    </div>
-  );
-}
-
-function formatAttributeValue(value: unknown) {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  return JSON.stringify(value, null, 2);
 }

@@ -9,8 +9,8 @@ Phase 3 combines ThingsBoard telemetry and attributes into normalized NMS dashbo
 * stateless BFF
 * no persistent database
 * no Redis in MVP
-* authentication via ThingsBoard user JWT is in rollout
-* authority-based access follows ThingsBoard roles (`TENANT_ADMIN`, `CUSTOMER_USER`)
+* public read-only portfolio mode
+* no frontend authentication or ThingsBoard user JWT flow
 * frontend never calls ThingsBoard directly
 
 ## Project structure
@@ -41,9 +41,7 @@ Dashboard endpoints:
 * `GET /api/v1/integrations/thingsboard/status`
 * `GET /api/v1/sites`
 * `GET /api/v1/sites/{siteKey}/devices`
-* `GET /api/v1/assets/{assetId}/attributes`
 * `GET /api/v1/devices/{deviceId}`
-* `GET /api/v1/devices/{deviceId}/attributes`
 * `GET /api/v1/devices/{deviceId}/telemetry/latest`
 * `GET /api/v1/devices/{deviceId}/telemetry/history`
 * `GET /api/v1/devices/{deviceId}/summary`
@@ -240,7 +238,7 @@ NEXT_PUBLIC_API_BASE_URL=
 6. Ensure external Docker network from `NMS_DOCKER_NETWORK` exists
 7. Configure Cloudflare Tunnel to route `/` to `127.0.0.1:3001` and `/api/` to `127.0.0.1:8080`
 8. Let Drone copy `docker-compose.prod.yml` and `deploy-prod.sh`, then run production deploy
-9. Validate dashboard login, sites, devices, alarms, and customer scoping
+9. Validate public read-only dashboard, sites, devices, alarms, and reports
 * `THINGSBOARD_API_KEY` stays runtime-only and is not baked into images.
 
 ### Infisical runtime secrets
@@ -292,7 +290,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 * BFF performs lightweight ThingsBoard reachability check through `/api/v1/integrations/thingsboard/status`.
 * `GET /api/v1/sites` never returns `404`. It returns real sites when available, otherwise stable placeholder JSON.
 * `GET /api/v1/sites/{siteKey}/devices` resolves site relations and returns related ThingsBoard devices.
-* Attribute endpoints return raw ThingsBoard attributes for site assets and devices.
+* Raw attribute endpoints are not exposed in public portfolio mode.
 * `GET /api/v1/devices/{deviceId}` returns basic normalized device identity.
 * `GET /api/v1/devices/{deviceId}/telemetry/latest` returns latest telemetry as key-value rows.
 * `GET /api/v1/devices/{deviceId}/summary` combines identity and latest telemetry into a compact NMS summary.
@@ -301,7 +299,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
 * Indexed interface telemetry such as `snmp.if.idx2.rx_bps` uses attributes such as `snmp.if.idx2.name = eth0` to display `eth0 RX Throughput`.
 * Indexed storage telemetry such as `snmp.host.storage.idx36.used_pct` uses storage description attributes to display labels such as `/ Storage Usage`; storage type is shown in the storage table.
 * Routing Client Attributes such as `route.ipv4.snapshot` and `route.ipv4.default.*` are normalized into a route summary and route table.
-* Raw telemetry and raw attributes remain available, but frontend shows them only under advanced/debug panels.
+* Raw telemetry and raw attributes are hidden from public frontend views; BFF may still use ThingsBoard attributes internally for normalization.
 * `GET /api/v1/alarms` returns tenant-wide alarms from ThingsBoard, normalized with severity, status, originator metadata, and pagination. Stable empty response when ThingsBoard is not configured or unreachable.
 * Overview dashboard and /alarms page use tenant alarm data for active alarm counts, critical severity tracking, and recent alarm tables.
 * Response never exposes ThingsBoard token.

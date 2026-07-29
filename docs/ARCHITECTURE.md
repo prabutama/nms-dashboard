@@ -9,11 +9,11 @@ Current rules:
 * BFF stays stateless.
 * No PostgreSQL.
 * No Redis.
-* Authentication is rolling out through ThingsBoard user JWT.
-* Access control follows ThingsBoard authorities.
+* Public portfolio access is read-only.
+* Frontend authentication and ThingsBoard user JWT flow are disabled.
 * ThingsBoard remains source of truth.
 * Frontend calls only BFF.
-* Raw telemetry and attributes remain available for advanced/debug views.
+* Raw telemetry and attributes are hidden from public frontend views.
 
 ## Structure
 
@@ -57,7 +57,7 @@ The dashboard endpoint combines:
 * attribute catalog overrides
 * freshness and basic health status
 
-Site/asset attributes are still exposed for debug and future enrichment. Phase 3A does not scan all sites for every dashboard request.
+Raw asset and device attributes are not exposed as public API endpoints. BFF still reads ThingsBoard attributes internally when needed for normalization and enrichment.
 
 ## Frontend
 
@@ -69,7 +69,7 @@ Responsibilities:
 * load sites and devices through BFF
 * use `GET /api/v1/devices/{deviceId}/dashboard` as primary selected-device view
 * render health cards, grouped metric cards, charts, interface sections, and storage sections
-* keep raw telemetry and raw attributes in collapsible advanced/debug panel
+* hide raw telemetry and raw attributes in public read-only mode
 
 Routes:
 

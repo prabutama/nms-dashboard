@@ -4,7 +4,6 @@ import "leaflet/dist/leaflet.css";
 
 import "./globals.css";
 
-import { AuthProvider } from "@/components/auth-provider";
 import { QueryProvider } from "@/components/query-provider";
 
 const poppins = Poppins({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
@@ -24,7 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className={poppins.className}>
         <QueryProvider>
-          <AuthProvider>{children}</AuthProvider>
+          {children}
         </QueryProvider>
       </body>
     </html>

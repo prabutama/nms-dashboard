@@ -37,7 +37,7 @@ Delivered:
 * integration status endpoint
 * minimal site inventory endpoint
 * site device relation endpoint
-* raw asset and device attributes endpoints
+* internal raw asset and device attribute reads for normalization
 * basic device detail endpoint
 * latest telemetry endpoint and frontend key-value view
 * historical numeric telemetry endpoint and frontend charts
@@ -50,8 +50,6 @@ Implemented in current Phase 2:
 * `GET /api/v1/integrations/thingsboard/status`
 * `GET /api/v1/sites`
 * `GET /api/v1/sites/{siteKey}/devices`
-* `GET /api/v1/assets/{assetId}/attributes`
-* `GET /api/v1/devices/{deviceId}/attributes`
 * `GET /api/v1/devices/{deviceId}`
 * `GET /api/v1/devices/{deviceId}/telemetry/latest`
 * `GET /api/v1/devices/{deviceId}/telemetry/history`
@@ -64,7 +62,7 @@ Implemented in current Phase 2:
 Not included in current Phase 2:
 
 * advanced chart configuration
-* authentication
+* frontend authentication
 * persistent storage
 
 ## Phase 3A and 3B: Dashboard View Model and UX
@@ -79,7 +77,7 @@ Delivered:
 * freshness, reachability, and health status in dashboard response
 * interface and storage catalog sections from attributes when present
 * frontend layout refactor into sidebar plus operational main panel
-* raw telemetry and attributes moved into advanced/debug UI
+* raw telemetry and attributes hidden from public frontend views
 * light professional multi-page NMS theme using Poppins, white cards, blue accents, and subtle status badges
 * indexed interface/storage metric label normalization from ThingsBoard attributes
 * routing panel from `route.ipv4.snapshot` and `route.ipv4.default.*` Client Attributes

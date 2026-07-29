@@ -19,19 +19,9 @@ The dashboard endpoint using this catalog is:
 GET /api/v1/devices/{deviceId}/dashboard
 ```
 
-## Attribute Endpoints
+## Attribute Usage
 
-Read site asset attributes:
-
-```txt
-GET /api/v1/assets/{assetId}/attributes
-```
-
-Read device attributes:
-
-```txt
-GET /api/v1/devices/{deviceId}/attributes
-```
+Raw asset and device attribute endpoints are not exposed in public read-only mode. BFF still reads ThingsBoard attributes internally to resolve metric labels, interface names, storage names, units, groups, and thresholds.
 
 Optional query params:
 
@@ -111,7 +101,7 @@ Device `SERVER_SCOPE` interface catalog attribute:
 * String, boolean, and JSON telemetry should render as badges or tables.
 * Attributes define labels, units, groups, and thresholds.
 * If attributes are missing, BFF still returns stable metric cards with fallback metadata.
-* Raw telemetry and raw attributes stay available in advanced/debug UI.
+* Raw telemetry and raw attributes are hidden from public frontend views.
 
 ## Indexed Interface Metrics
 

@@ -2,11 +2,11 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useQueries, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 
 import { DashboardShell } from "@/components/dashboard-shell";
 import { DeviceLink, StatCard, StatusBadge } from "@/components/nms-ui";
-import { fetchAlarms, fetchAttributes, fetchReportSites, fetchReportSummary, fetchSites } from "@/lib/api";
+import { fetchAlarms, fetchReportSummary, fetchSites } from "@/lib/api";
 
 const SiteMapPanel = dynamic(() => import("@/components/site-map-panel").then((mod) => mod.SiteMapPanel), {
   ssr: false,
@@ -29,19 +29,6 @@ export function OverviewDashboard() {
     queryFn: () => fetchReportSummary("24h"),
     refetchInterval: 60_000,
   });
-  const reportSitesQuery = useQuery({
-    queryKey: ["report-sites", "24h"],
-    queryFn: () => fetchReportSites("24h"),
-    refetchInterval: 60_000,
-  });
-  const siteAttributeQueries = useQueries({
-    queries: (sitesQuery.data?.items || []).map((site) => ({
-      queryKey: ["site-attributes", site.assetId],
-      queryFn: () => fetchAttributes("assets", site.assetId),
-      enabled: sitesQuery.data !== undefined,
-      refetchInterval: 60_000,
-    })),
-  });
   const topIssueDevices = summaryQuery.data?.topDevicesByIssues || [];
   const criticalDevices = topIssueDevices.filter((device) => device.health === "critical").slice(0, 6);
   const staleCount = summaryQuery.data?.summary.staleDeviceCount ?? 0;
@@ -49,9 +36,7 @@ export function OverviewDashboard() {
   const activeAlarmCount = activeAlarmsQuery.data?.totalElements ?? 0;
   const alarmCriticalCount = (activeAlarmsQuery.data?.items || []).filter((a) => a.severity === "CRITICAL" || a.severity === "MAJOR").length;
   const recentAlarms = allAlarmsQuery.data?.items?.slice(0, 5) || [];
-  const siteMapItems = (sitesQuery.data?.items || [])
-    .map((site, index) => buildSiteMapItem(site, siteAttributeQueries[index]?.data, reportSitesQuery.data?.items.find((item) => item.siteKey === site.siteKey)))
-    .filter((item): item is SiteMapItem => item !== null);
+  const siteMapItems: SiteMapItem[] = [];
   const missingCoordinateCount = (sitesQuery.data?.items.length || 0) - siteMapItems.length;
 
   return (
@@ -154,42 +139,3 @@ type SiteMapItem = {
   activeAlarmCount: number;
   health: string;
 };
-
-function buildSiteMapItem(
-  site: { siteKey: string; name: string },
-  data: Awaited<ReturnType<typeof fetchAttributes>> | undefined,
-  reportSite?: Awaited<ReturnType<typeof fetchReportSites>>["items"][number],
-) {
-  if (!data) {
-    return null;
-  }
-  const latitude = readCoordinate(data, "latitude");
-  const longitude = readCoordinate(data, "longitude");
-  if (latitude === null || longitude === null) {
-    return null;
-  }
-  return {
-    siteKey: site.siteKey,
-    name: site.name,
-    latitude,
-    longitude,
-    deviceCount: reportSite?.deviceCount ?? 0,
-    onlineDeviceCount: reportSite?.onlineDeviceCount ?? 0,
-    activeAlarmCount: reportSite?.activeAlarmCount ?? 0,
-    health: reportSite?.health ?? "unknown",
-  };
-}
-
-function readCoordinate(data: Awaited<ReturnType<typeof fetchAttributes>>, key: string) {
-  for (const items of Object.values(data.scopes)) {
-    const entry = items.find((item) => item.key.toLowerCase() === key);
-    if (!entry) {
-      continue;
-    }
-    const numeric = Number(entry.value);
-    if (Number.isFinite(numeric)) {
-      return numeric;
-    }
-  }
-  return null;
-}

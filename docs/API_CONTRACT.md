@@ -69,43 +69,9 @@ Example response:
 }
 ```
 
-### `GET /api/v1/assets/{assetId}/attributes`
+### Raw attribute endpoints
 
-Returns raw ThingsBoard attributes for a site asset.
-
-Query params:
-
-* `scope`: optional. Defaults to `SERVER_SCOPE` for assets.
-* `keys`: optional comma-separated attribute keys.
-
-Example response:
-
-```json
-{
-  "entityType": "ASSET",
-  "entityId": "asset-id",
-  "scopes": {
-    "SERVER_SCOPE": [
-      {
-        "key": "nmsSite",
-        "value": { "region": "Jakarta" },
-        "valueType": "json",
-        "lastUpdateTs": 1710000000000
-      }
-    ]
-  },
-  "source": "thingsboard",
-  "message": "Attributes loaded from ThingsBoard"
-}
-```
-
-### `GET /api/v1/devices/{deviceId}/attributes`
-
-Returns raw ThingsBoard attributes for a device.
-
-By default it reads `SERVER_SCOPE`, `CLIENT_SCOPE`, and `SHARED_SCOPE`. Use `scope` to read only one scope.
-
-Example response shape is same as asset attributes with `entityType: "DEVICE"`.
+Raw asset and device attribute endpoints are not exposed in public read-only mode. BFF still reads ThingsBoard attributes internally for dashboard normalization, metric labels, interface names, storage names, and topology enrichment.
 
 ### `GET /api/v1/devices/{deviceId}`
 
@@ -341,49 +307,9 @@ Example response:
 }
 ```
 
-### `POST /api/v1/alarms/{alarmId}/ack`
+### Alarm write actions
 
-Acknowledge one alarm through ThingsBoard. BFF proxies request to ThingsBoard `POST /api/alarm/{alarmId}/ack` using tenant API key auth.
-
-Example response:
-
-```json
-{
-  "ok": true,
-  "action": "ack",
-  "alarmId": "e3c7e6b0-480b-11f1-9d47-25e13b93d50b",
-  "alarm": {
-    "alarmId": "e3c7e6b0-480b-11f1-9d47-25e13b93d50b",
-    "status": "ACTIVE_ACK",
-    "acknowledged": true,
-    "cleared": false
-  },
-  "source": "thingsboard",
-  "message": "Alarm acknowledged"
-}
-```
-
-### `POST /api/v1/alarms/{alarmId}/clear`
-
-Clear one alarm through ThingsBoard. BFF proxies request to ThingsBoard `POST /api/alarm/{alarmId}/clear` using tenant API key auth.
-
-Example response:
-
-```json
-{
-  "ok": true,
-  "action": "clear",
-  "alarmId": "e3c7e6b0-480b-11f1-9d47-25e13b93d50b",
-  "alarm": {
-    "alarmId": "e3c7e6b0-480b-11f1-9d47-25e13b93d50b",
-    "status": "CLEARED_ACK",
-    "acknowledged": true,
-    "cleared": true
-  },
-  "source": "thingsboard",
-  "message": "Alarm cleared"
-}
-```
+`POST /api/v1/alarms/{alarmId}/ack` and `POST /api/v1/alarms/{alarmId}/clear` are not exposed in public read-only mode. Frontend alarm views are read-only.
 
 ### `GET /api/v1/health`
 
