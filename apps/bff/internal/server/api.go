@@ -201,6 +201,10 @@ func (s *apiServer) registerRoutes(r chi.Router) {
 	r.Get("/health", s.healthHandler())
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/health", s.healthHandler())
+		r.Post("/auth/login", s.authLoginHandler())
+		r.Post("/auth/refresh", s.authRefreshHandler())
+		r.With(s.requireTBAuth()).Get("/auth/me", s.authMeHandler())
+		r.With(s.requireTBAuth()).Post("/auth/logout", s.authLogoutHandler())
 		r.Get("/integrations/thingsboard/status", s.thingsBoardStatusHandler())
 		r.Get("/alarms", s.alarmsHandler())
 		r.With(s.cacheGetResponse(60*time.Second)).Get("/sites", s.sitesHandler())
