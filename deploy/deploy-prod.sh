@@ -96,6 +96,12 @@ containers_healthy() {
       docker compose -f "$COMPOSE_FILE" ps -q nms-web
     )"
 
+    if [ -z "$BFF_ID" ] || [ -z "$WEB_ID" ]; then
+      attempt=$((attempt + 1))
+      sleep 2
+      continue
+    fi
+
     BFF_STATUS="$(
       docker inspect \
         --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \

@@ -31,7 +31,7 @@ steps:
       - npm run build
 
   - name: publish-images
-    image: docker:27-cli
+    image: prabutama/nms-ci-tools:1.0.0
     pull: always
     environment:
       INFISICAL_DOMAIN:
@@ -43,21 +43,6 @@ steps:
       INFISICAL_CLIENT_SECRET:
         from_secret: infisical_client_secret
     commands:
-      - |
-        sed -i 's#dl-cdn.alpinelinux.org#dl-4.alpinelinux.org#g' /etc/apk/repositories
-        for attempt in 1 2 3 4 5; do
-          apk add --no-cache bash wget && break
-          if [ "$attempt" = "5" ]; then exit 1; fi
-          sleep 10
-        done
-      - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
-      - |
-        sed -i 's#dl-cdn.alpinelinux.org#dl-4.alpinelinux.org#g' /etc/apk/repositories
-        for attempt in 1 2 3 4 5; do
-          apk add --no-cache infisical && break
-          if [ "$attempt" = "5" ]; then exit 1; fi
-          sleep 10
-        done
       - |
 
         export INFISICAL_DISABLE_UPDATE_CHECK=true
@@ -119,7 +104,7 @@ steps:
         - main
 
   - name: deploy-production
-    image: alpine:3.20
+    image: prabutama/nms-ci-tools:1.0.0
     pull: always
     environment:
       INFISICAL_DOMAIN:
@@ -131,21 +116,6 @@ steps:
       INFISICAL_CLIENT_SECRET:
         from_secret: infisical_client_secret
     commands:
-      - |
-        sed -i 's#dl-cdn.alpinelinux.org#dl-4.alpinelinux.org#g' /etc/apk/repositories
-        for attempt in 1 2 3 4 5; do
-          apk add --no-cache bash wget openssh-client && break
-          if [ "$attempt" = "5" ]; then exit 1; fi
-          sleep 10
-        done
-      - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
-      - |
-        sed -i 's#dl-cdn.alpinelinux.org#dl-4.alpinelinux.org#g' /etc/apk/repositories
-        for attempt in 1 2 3 4 5; do
-          apk add --no-cache infisical && break
-          if [ "$attempt" = "5" ]; then exit 1; fi
-          sleep 10
-        done
       - |
         export INFISICAL_TOKEN="$(
           infisical login \
@@ -160,7 +130,7 @@ steps:
         infisical run \
           --domain="$INFISICAL_DOMAIN" \
           --projectId="$INFISICAL_PROJECT_ID" \
-          --env=prod \
+            --env=prod \
           --path=/ci \
           -- sh -eu -c '
             mkdir -p "$HOME/.ssh"
@@ -173,6 +143,12 @@ steps:
             printf "%s\n" "$DEPLOY_SSH_PRIVATE_KEY" \
               > /tmp/nms-dashboard-deploy-key
             chmod 600 /tmp/nms-dashboard-deploy-key
+
+            ssh \
+              -p "${DEPLOY_PORT:-22}" \
+              -i /tmp/nms-dashboard-deploy-key \
+              "$DEPLOY_USER@$DEPLOY_HOST" \
+              "sudo mkdir -p /opt/nms-dashboard && sudo chown \$USER:\$USER /opt/nms-dashboard"
 
             scp \
               -P "${DEPLOY_PORT:-22}" \
