@@ -25,7 +25,7 @@ body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   min-height: 100vh;
-  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
+  font-family: Poppins, Arial, Helvetica, sans-serif;
 }
 
 .leaflet-popup-content-wrapper,
