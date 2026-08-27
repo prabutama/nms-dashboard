@@ -44,6 +44,7 @@ steps:
         from_secret: infisical_client_secret
     commands:
       - |
+        sed -i 's#dl-cdn.alpinelinux.org#dl-4.alpinelinux.org#g' /etc/apk/repositories
         for attempt in 1 2 3 4 5; do
           apk add --no-cache bash wget && break
           if [ "$attempt" = "5" ]; then exit 1; fi
@@ -51,6 +52,7 @@ steps:
         done
       - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
       - |
+        sed -i 's#dl-cdn.alpinelinux.org#dl-4.alpinelinux.org#g' /etc/apk/repositories
         for attempt in 1 2 3 4 5; do
           apk add --no-cache infisical && break
           if [ "$attempt" = "5" ]; then exit 1; fi
@@ -130,6 +132,7 @@ steps:
         from_secret: infisical_client_secret
     commands:
       - |
+        sed -i 's#dl-cdn.alpinelinux.org#dl-4.alpinelinux.org#g' /etc/apk/repositories
         for attempt in 1 2 3 4 5; do
           apk add --no-cache bash wget openssh-client && break
           if [ "$attempt" = "5" ]; then exit 1; fi
@@ -137,6 +140,7 @@ steps:
         done
       - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
       - |
+        sed -i 's#dl-cdn.alpinelinux.org#dl-4.alpinelinux.org#g' /etc/apk/repositories
         for attempt in 1 2 3 4 5; do
           apk add --no-cache infisical && break
           if [ "$attempt" = "5" ]; then exit 1; fi
