@@ -43,9 +43,19 @@ steps:
       INFISICAL_CLIENT_SECRET:
         from_secret: infisical_client_secret
     commands:
-      - apk add --no-cache bash wget
+      - |
+        for attempt in 1 2 3 4 5; do
+          apk add --no-cache bash wget && break
+          if [ "$attempt" = "5" ]; then exit 1; fi
+          sleep 10
+        done
       - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
-      - apk add --no-cache infisical
+      - |
+        for attempt in 1 2 3 4 5; do
+          apk add --no-cache infisical && break
+          if [ "$attempt" = "5" ]; then exit 1; fi
+          sleep 10
+        done
       - |
 
         export INFISICAL_DISABLE_UPDATE_CHECK=true
@@ -119,9 +129,19 @@ steps:
       INFISICAL_CLIENT_SECRET:
         from_secret: infisical_client_secret
     commands:
-      - apk add --no-cache bash wget openssh-client
+      - |
+        for attempt in 1 2 3 4 5; do
+          apk add --no-cache bash wget openssh-client && break
+          if [ "$attempt" = "5" ]; then exit 1; fi
+          sleep 10
+        done
       - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
-      - apk add --no-cache infisical
+      - |
+        for attempt in 1 2 3 4 5; do
+          apk add --no-cache infisical && break
+          if [ "$attempt" = "5" ]; then exit 1; fi
+          sleep 10
+        done
       - |
         export INFISICAL_TOKEN="$(
           infisical login \
