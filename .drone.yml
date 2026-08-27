@@ -32,6 +32,7 @@ steps:
 
   - name: publish-images
     image: docker:27-cli
+    pull: always
     environment:
       INFISICAL_DOMAIN:
         from_secret: infisical_domain
@@ -44,7 +45,6 @@ steps:
     commands:
       - apk add --no-cache bash wget
       - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
-      - apk update
       - apk add --no-cache infisical
       - |
 
@@ -108,6 +108,7 @@ steps:
 
   - name: deploy-production
     image: alpine:3.20
+    pull: always
     environment:
       INFISICAL_DOMAIN:
         from_secret: infisical_domain
@@ -120,7 +121,6 @@ steps:
     commands:
       - apk add --no-cache bash wget openssh-client
       - wget -qO- "https://artifacts-cli.infisical.com/setup.apk.sh" | sh
-      - apk update
       - apk add --no-cache infisical
       - |
         export INFISICAL_TOKEN="$(
