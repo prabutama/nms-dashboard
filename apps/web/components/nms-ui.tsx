@@ -23,11 +23,11 @@ export function MetricCard({ metric }: { metric: DashboardMetricCard }) {
 
 export function StatCard({ title, value, note, status }: { title: string; value: string | number; note?: string; status?: string }) {
   return (
-    <div className="flex items-center justify-between border border-slate-300 bg-white px-4 py-3 shadow-sm">
-      <div>
+    <div className={`flex items-center justify-between border border-slate-300 bg-white px-4 py-3 shadow-sm ${status ? `border-l-4 ${statusBorderClass(status)}` : ""}`}>
+      <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-[0.02em] text-slate-600">{title}</p>
         <p className="mt-0.5 text-base font-semibold text-slate-950">{value}</p>
-        {note ? <p className="mt-0.5 text-[11px] text-slate-600">{note}</p> : null}
+        {note ? <p className="mt-0.5 truncate text-[11px] text-slate-600">{note}</p> : null}
       </div>
       {status ? <StatusBadge status={status} /> : null}
     </div>
@@ -64,3 +64,20 @@ function badgeClass(status: string) {
   }
 }
 
+function statusBorderClass(status: string) {
+  switch (status) {
+    case "normal":
+    case "fresh":
+    case "online":
+    case "active":
+      return "border-l-emerald-500";
+    case "warning":
+    case "stale":
+      return "border-l-amber-500";
+    case "critical":
+    case "offline":
+      return "border-l-red-600";
+    default:
+      return "border-l-slate-400";
+  }
+}

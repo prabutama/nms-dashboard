@@ -13,7 +13,7 @@ const navItems = [
   { href: "/reports", label: "Reports", icon: FileText },
 ];
 
-export function DashboardShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
+export function DashboardShell({ title, subtitle, actions, children }: { title: string; subtitle: string; actions?: React.ReactNode; children: React.ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -88,7 +88,7 @@ export function DashboardShell({ title, subtitle, children }: { title: string; s
 
       <div className={contentOffsetClass}>
         <div className="border-b border-slate-300 bg-white px-4 py-3 shadow-sm sm:px-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
               <button
                 type="button"
@@ -99,10 +99,11 @@ export function DashboardShell({ title, subtitle, children }: { title: string; s
                 <Menu className="h-4 w-4" />
               </button>
               <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.03em] text-blue-700">Monitoring</p>
-              <h1 className="text-lg font-semibold tracking-tight text-slate-950">{title}</h1>
+                <p className="text-xs font-semibold uppercase tracking-[0.03em] text-blue-700">Monitoring</p>
+                <h1 className="text-lg font-semibold tracking-tight text-slate-950">{title}</h1>
               </div>
             </div>
+            {actions ? <div className="shrink-0">{actions}</div> : null}
           </div>
           {subtitle ? <p className="mt-0.5 max-w-3xl text-sm text-slate-600">{subtitle}</p> : null}
         </div>
