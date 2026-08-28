@@ -1543,7 +1543,16 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 			} else if hasTelemetry {
 				health = "normal"
 			}
-			if freshness == "stale" && health != "critical" {
+			criticalAlarm := false
+			for _, alarm := range deviceAlarms {
+				if alarm.Severity == "CRITICAL" || alarm.Severity == "MAJOR" {
+					criticalAlarm = true
+					break
+				}
+			}
+			if health != "critical" && (criticalAlarm || packetLoss >= 10 || cpuAvg >= 90 || memAvg >= 90) {
+				health = "critical"
+			} else if health != "critical" && (freshness == "stale" || alarmCount > 0 || packetLoss >= 5 || cpuAvg >= 75 || memAvg >= 80 || avgLatency >= 100) {
 				health = "warning"
 			}
 

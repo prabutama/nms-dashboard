@@ -35,7 +35,10 @@ export function OverviewDashboard() {
     refetchInterval: 60_000,
   });
   const topIssueDevices = summaryQuery.data?.topDevicesByIssues || [];
-  const criticalDevices = topIssueDevices.filter((device) => device.health === "critical").slice(0, 6);
+  const issueDevices = topIssueDevices
+    .filter((device) => device.health === "critical" || device.health === "warning")
+    .slice(0, 6);
+  const criticalDeviceCount = topIssueDevices.filter((device) => device.health === "critical").length;
   const staleCount = summaryQuery.data?.summary.staleDeviceCount ?? 0;
 
   const activeAlarmCount = activeAlarmsQuery.data?.totalElements ?? 0;
@@ -67,7 +70,7 @@ export function OverviewDashboard() {
         <StatCard title="Devices" value={summaryQuery.data?.summary.deviceCount ?? 0} note="Total network devices" />
         <StatCard title="Online" value={summaryQuery.data?.summary.onlineDeviceCount ?? 0} note="Reachability based" status="normal" />
         <StatCard title="Active Alarms" value={activeAlarmCount} note={`${alarmCriticalCount} critical/major`} status={activeAlarmCount > 0 ? "warning" : "normal"} />
-        <StatCard title="Critical Devices" value={criticalDevices.length} note="From sampled dashboards" status={criticalDevices.length > 0 ? "critical" : "normal"} />
+        <StatCard title="Critical Devices" value={criticalDeviceCount} note="From sampled dashboards" status={criticalDeviceCount > 0 ? "critical" : "normal"} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
@@ -80,8 +83,8 @@ export function OverviewDashboard() {
             <Link href="/devices" className="border border-blue-800 bg-blue-700 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-blue-800">View devices</Link>
           </div>
           {summaryQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-600">Loading device health...</p> : null}
-          {criticalDevices.length === 0 ? <p className="border-b border-slate-200 px-4 py-5 text-xs text-slate-600">No critical devices among the sampled set.</p> : null}
-          {criticalDevices.map((device) => (
+          {issueDevices.length === 0 ? <p className="border-b border-slate-200 px-4 py-5 text-xs text-slate-600">No critical or warning devices among the sampled set.</p> : null}
+          {issueDevices.map((device) => (
             <DeviceLink key={device.deviceId} href={`/devices/${device.deviceId}${device.siteKey ? `?site=${device.siteKey}` : ""}`} name={device.name} type={device.type} status={device.health} />
           ))}
         </div>
