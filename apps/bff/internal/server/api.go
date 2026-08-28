@@ -1485,6 +1485,7 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 		siteStaleCount := 0
 		siteAlarmCount := 0
 		siteCriticalCount := 0
+		siteDeviceRowStart := len(deviceRows)
 		telemetryByDevice := s.loadLatestTelemetryBatch(ctx, devices)
 
 		for _, device := range devices {
@@ -1609,9 +1610,20 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 		}
 
 		siteHealth := "normal"
-		if siteCriticalCount > 0 {
+		siteHasWarningDevice := false
+		siteHasCriticalDevice := false
+		for i := siteDeviceRowStart; i < len(deviceRows); i++ {
+			if deviceRows[i].Health == "critical" {
+				siteHasCriticalDevice = true
+				break
+			}
+			if deviceRows[i].Health == "warning" {
+				siteHasWarningDevice = true
+			}
+		}
+		if siteCriticalCount > 0 || siteHasCriticalDevice {
 			siteHealth = "critical"
-		} else if siteAlarmCount > 0 {
+		} else if siteAlarmCount > 0 || siteHasWarningDevice {
 			siteHealth = "warning"
 		}
 
@@ -2029,6 +2041,7 @@ func dashboardFromPartialDevice(device thingsboard.Device) nms.DeviceDashboard {
 
 func buildDeviceDashboard(device thingsboard.Device, telemetry []nms.TelemetryValue, attributes []nms.AttributeValue) nms.DeviceDashboard {
 	attributeMap := attributesByKey(attributes)
+	enrichAttributeMapFromTelemetry(attributeMap, telemetry)
 	catalog := dashboardCatalog(attributeMap)
 	cards := buildMetricCards(telemetry, catalog, attributeMap)
 	groups := groupMetricCards(cards)
@@ -2094,6 +2107,9 @@ func firstNonEmptyAttributeValue(attributes []nms.AttributeValue, key string) st
 func buildMetricCards(telemetry []nms.TelemetryValue, catalog map[string]metricCatalogEntry, attributes map[string]nms.AttributeValue) []nms.DashboardMetricCard {
 	cards := make([]nms.DashboardMetricCard, 0, len(telemetry))
 	for _, item := range telemetry {
+		if isTelemetryMetadataKey(item.Key) {
+			continue
+		}
 		entry := catalogEntryForKey(item.Key, catalog, attributes)
 		value, numeric := parseTelemetryValue(item.Value)
 		status := "unknown"
@@ -2139,6 +2155,38 @@ func buildMetricCards(telemetry []nms.TelemetryValue, catalog map[string]metricC
 	})
 
 	return cards
+}
+
+func enrichAttributeMapFromTelemetry(attributes map[string]nms.AttributeValue, telemetry []nms.TelemetryValue) {
+	for _, item := range telemetry {
+		if !isTelemetryMetadataKey(item.Key) {
+			continue
+		}
+		if _, exists := attributes[item.Key]; exists {
+			continue
+		}
+		value := strings.TrimSpace(item.Value)
+		if value == "" {
+			continue
+		}
+		attributes[item.Key] = nms.AttributeValue{Key: item.Key, Value: value, ValueType: "string", LastUpdateTs: item.Timestamp}
+	}
+}
+
+func isTelemetryMetadataKey(key string) bool {
+	if matches := interfaceMetricKeyRE.FindStringSubmatch(key); len(matches) == 3 {
+		switch matches[2] {
+		case "name", "alias", "description":
+			return true
+		}
+	}
+	if matches := storageMetricKeyRE.FindStringSubmatch(key); len(matches) == 3 {
+		switch matches[2] {
+		case "type", "description", "name":
+			return true
+		}
+	}
+	return false
 }
 
 func groupMetricCards(cards []nms.DashboardMetricCard) []nms.DashboardMetricGroup {
@@ -2308,7 +2356,7 @@ func interfaceMetricEntry(key string, attributes map[string]nms.AttributeValue) 
 		shortLabel = humanizeKey(metric)
 	}
 
-	return metricCatalogEntry{
+	entry := metricCatalogEntry{
 		Key:        key,
 		Label:      name + " " + shortLabel,
 		ShortLabel: shortLabel,
@@ -2317,7 +2365,14 @@ func interfaceMetricEntry(key string, attributes map[string]nms.AttributeValue) 
 		Subgroup:   name,
 		Order:      300 + orderOffset,
 		VisualType: interfaceMetricVisual(metric),
-	}, true
+	}
+	if metric == "utilization_pct" || metric == "rx_utilization_pct" || metric == "tx_utilization_pct" {
+		entry.Warn = 70
+		entry.Critical = 90
+		entry.HasWarn = true
+		entry.HasCrit = true
+	}
+	return entry, true
 }
 
 func storageMetricEntry(key string, attributes map[string]nms.AttributeValue) (metricCatalogEntry, bool) {
@@ -2384,6 +2439,8 @@ func interfaceMetricLabel(metric string) (string, string, int) {
 		return "Admin Status", "", 40
 	case "speed_bps":
 		return "Link Speed", "bps", 50
+	case "utilization_pct", "rx_utilization_pct", "tx_utilization_pct":
+		return "Utilization", "%", 55
 	case "in_errors":
 		return "RX Errors", "", 60
 	case "out_errors":
