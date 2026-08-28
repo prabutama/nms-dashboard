@@ -2107,7 +2107,7 @@ func firstNonEmptyAttributeValue(attributes []nms.AttributeValue, key string) st
 func buildMetricCards(telemetry []nms.TelemetryValue, catalog map[string]metricCatalogEntry, attributes map[string]nms.AttributeValue) []nms.DashboardMetricCard {
 	cards := make([]nms.DashboardMetricCard, 0, len(telemetry))
 	for _, item := range telemetry {
-		if isTelemetryMetadataKey(item.Key) {
+		if isTelemetryMetadataKey(item.Key) || isLegacyInterfaceTelemetryKey(item.Key) {
 			continue
 		}
 		entry := catalogEntryForKey(item.Key, catalog, attributes)
@@ -2187,6 +2187,15 @@ func isTelemetryMetadataKey(key string) bool {
 		}
 	}
 	return false
+}
+
+func isLegacyInterfaceTelemetryKey(key string) bool {
+	switch key {
+	case "snmp.if.name", "snmp.if.rx_bps", "snmp.if.tx_bps", "snmp.if.utilization_pct":
+		return true
+	default:
+		return false
+	}
 }
 
 func groupMetricCards(cards []nms.DashboardMetricCard) []nms.DashboardMetricGroup {
@@ -2305,7 +2314,9 @@ func defaultMetricCatalog() map[string]metricCatalogEntry {
 		{Key: "icmp.jitter_ms", Label: "Jitter", Unit: "ms", Group: "availability", Order: 40, VisualType: "line", Warn: 30, Critical: 80, HasWarn: true, HasCrit: true},
 		{Key: "snmp.host.cpu.load_pct", Label: "CPU Usage", Unit: "%", Group: "system", Order: 100, VisualType: "line", Warn: 75, Critical: 90, HasWarn: true, HasCrit: true},
 		{Key: "snmp.host.memory.used_pct", Label: "Memory Used", Unit: "%", Group: "system", Order: 110, VisualType: "line", Warn: 80, Critical: 90, HasWarn: true, HasCrit: true},
+		{Key: "snmp.host.memory.size_kb", Label: "Memory Size", Unit: "KB", Group: "system", Order: 115, VisualType: "value"},
 		{Key: "snmp.host.swap.used_pct", Label: "Swap Used", Unit: "%", Group: "system", Order: 120, VisualType: "line", Warn: 50, Critical: 80, HasWarn: true, HasCrit: true},
+		{Key: "snmp.host.uptime_seconds", Label: "Uptime", Unit: "s", Group: "system", Order: 130, VisualType: "value"},
 	}
 
 	catalog := make(map[string]metricCatalogEntry, len(entries))
