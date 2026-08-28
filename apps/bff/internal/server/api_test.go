@@ -1695,6 +1695,7 @@ func TestReportDevicesNotConfigured(t *testing.T) {
 func TestReportSummaryAndSitesAndDevices(t *testing.T) {
 	t.Parallel()
 
+	alarmRequests := 0
 	thingsBoard := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		if requireAdminBearerUser(t, w, r) {
@@ -1727,6 +1728,7 @@ func TestReportSummaryAndSitesAndDevices(t *testing.T) {
 		case "/api/plugins/telemetry/DEVICE/device-bb-1/values/timeseries":
 			_, _ = w.Write([]byte(`{"icmp.latency_ms":[{"ts":1710000000000,"value":"200.0"}],"icmp.packet_loss_pct":[{"ts":1710000000000,"value":"3.5"}]}`))
 		case "/api/alarms":
+			alarmRequests++
 			_, _ = w.Write([]byte(`{"data":[{"id":{"entityType":"ALARM","id":"alarm-1"},"createdTime":1710000000000,"type":"Link Down","severity":"CRITICAL","status":"ACTIVE_UNACK","acknowledged":false,"cleared":false,"originator":{"entityType":"DEVICE","id":"device-hq-2"},"originatorName":"hq-server","originatorLabel":"HQ Server","originatorDisplayName":"HQ Server","startTs":1710000000000,"endTs":1710000000000,"ackTs":0,"clearTs":0,"details":{}},{"id":{"entityType":"ALARM","id":"alarm-2"},"createdTime":1710000000001,"type":"High Latency","severity":"MAJOR","status":"ACTIVE_ACK","acknowledged":true,"cleared":false,"originator":{"entityType":"DEVICE","id":"device-bb-1"},"originatorName":"bb-router","originatorLabel":"BB Router","originatorDisplayName":"BB Router","startTs":1710000000001,"endTs":1710000000001,"ackTs":1710000000001,"clearTs":0,"details":{}}],"totalPages":1,"totalElements":2,"hasNext":false}`))
 		default:
 			t.Fatalf("unexpected path %s", r.URL.Path)
@@ -1802,5 +1804,8 @@ func TestReportSummaryAndSitesAndDevices(t *testing.T) {
 
 	if strings.Contains(body, "test-token") {
 		t.Fatalf("token leaked in response body: %s", body)
+	}
+	if alarmRequests != 1 {
+		t.Fatalf("expected shared report snapshot to load alarms once, got %d", alarmRequests)
 	}
 }

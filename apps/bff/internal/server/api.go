@@ -28,10 +28,13 @@ var (
 )
 
 type apiServer struct {
-	cfg    config.Config
-	logger *slog.Logger
-	tb     *thingsboard.Client
-	cache  *memoryCache
+	cfg           config.Config
+	logger        *slog.Logger
+	tb            *thingsboard.Client
+	cache         *memoryCache
+	reportsMu     sync.Mutex
+	reportsCache  map[string]reportsSnapshotCacheEntry
+	reportsFlight map[string]*reportsSnapshotCall
 }
 
 type integrationStatusResponse struct {
@@ -180,7 +183,13 @@ type metricCatalogEntry struct {
 }
 
 func newAPIServer(cfg config.Config, logger *slog.Logger) *apiServer {
-	server := &apiServer{cfg: cfg, logger: logger, cache: newMemoryCache(cfg.CacheTTLSeconds)}
+	server := &apiServer{
+		cfg:           cfg,
+		logger:        logger,
+		cache:         newMemoryCache(cfg.CacheTTLSeconds),
+		reportsCache:  make(map[string]reportsSnapshotCacheEntry),
+		reportsFlight: make(map[string]*reportsSnapshotCall),
+	}
 
 	if cfg.HasThingsBoardSetup {
 		client, err := thingsboard.NewClient(thingsboard.Config{
@@ -1426,9 +1435,77 @@ type reportsSnapshot struct {
 	generatedAt        string
 }
 
+type reportsSnapshotCacheEntry struct {
+	snapshot  *reportsSnapshot
+	expiresAt time.Time
+}
+
+type reportsSnapshotCall struct {
+	done     chan struct{}
+	snapshot *reportsSnapshot
+	err      error
+}
+
 type deviceTelemetrySnapshot struct {
 	telemetry []thingsboard.TelemetryValue
 	err       error
+}
+
+func (s *apiServer) getReportsSnapshot(ctx context.Context, r *http.Request) (*reportsSnapshot, error) {
+	cacheKey := s.reportsSnapshotCacheKey(r)
+	now := time.Now()
+
+	s.reportsMu.Lock()
+	if entry, ok := s.reportsCache[cacheKey]; ok {
+		if now.Before(entry.expiresAt) && entry.snapshot != nil {
+			snapshot := entry.snapshot
+			s.reportsMu.Unlock()
+			return snapshot, nil
+		}
+		delete(s.reportsCache, cacheKey)
+	}
+	if call, ok := s.reportsFlight[cacheKey]; ok {
+		s.reportsMu.Unlock()
+		select {
+		case <-call.done:
+			return call.snapshot, call.err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	call := &reportsSnapshotCall{done: make(chan struct{})}
+	s.reportsFlight[cacheKey] = call
+	s.reportsMu.Unlock()
+
+	snapshot, err := s.buildReportsSnapshot(ctx, r)
+
+	s.reportsMu.Lock()
+	call.snapshot = snapshot
+	call.err = err
+	delete(s.reportsFlight, cacheKey)
+	if err == nil && snapshot != nil {
+		ttl := time.Duration(s.cfg.CacheTTLSeconds) * time.Second
+		if ttl <= 0 {
+			ttl = 30 * time.Second
+		}
+		s.reportsCache[cacheKey] = reportsSnapshotCacheEntry{snapshot: snapshot, expiresAt: time.Now().Add(ttl)}
+	}
+	close(call.done)
+	s.reportsMu.Unlock()
+
+	return snapshot, err
+}
+
+func (s *apiServer) reportsSnapshotCacheKey(r *http.Request) string {
+	rangeLabel := strings.TrimSpace(r.URL.Query().Get("range"))
+	if rangeLabel == "" {
+		rangeLabel = "24h"
+	}
+	key := "range=" + rangeLabel
+	if user, ok := authUserFromContext(r.Context()); ok {
+		key += "|auth=" + user.Authority + "|customer=" + user.CustomerID + "|user=" + user.ID
+	}
+	return hashCacheKey(key)
 }
 
 func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (*reportsSnapshot, error) {
@@ -1704,7 +1781,7 @@ func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 			return
 		}
 
-		snapshot, err := s.buildReportsSnapshot(r.Context(), r)
+		snapshot, err := s.getReportsSnapshot(r.Context(), r)
 		if err != nil {
 			s.logger.Warn("reports: load sites failed", "error", err)
 			writeJSON(w, http.StatusOK, reportSummaryResponse{
@@ -1737,7 +1814,7 @@ func (s *apiServer) reportsSitesHandler() http.HandlerFunc {
 			return
 		}
 
-		snapshot, err := s.buildReportsSnapshot(r.Context(), r)
+		snapshot, err := s.getReportsSnapshot(r.Context(), r)
 		if err != nil {
 			s.logger.Warn("reports: load sites failed", "error", err)
 			writeJSON(w, http.StatusOK, reportSitesListResponse{
@@ -1769,7 +1846,7 @@ func (s *apiServer) reportsDevicesHandler() http.HandlerFunc {
 		}
 
 		siteFilter := strings.TrimSpace(r.URL.Query().Get("siteKey"))
-		snapshot, err := s.buildReportsSnapshot(r.Context(), r)
+		snapshot, err := s.getReportsSnapshot(r.Context(), r)
 		if err != nil {
 			s.logger.Warn("reports: load sites for devices failed", "error", err)
 			writeJSON(w, http.StatusOK, reportDevicesListResponse{
