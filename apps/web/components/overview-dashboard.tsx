@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { DashboardShell } from "@/components/dashboard-shell";
 import { DeviceLink, StatCard, StatusBadge } from "@/components/nms-ui";
-import { fetchAlarms, fetchReportSummary, fetchSites } from "@/lib/api";
+import { fetchAlarms, fetchReportSites, fetchReportSummary, fetchSites } from "@/lib/api";
 
 const SiteMapPanel = dynamic(() => import("@/components/site-map-panel").then((mod) => mod.SiteMapPanel), {
   ssr: false,
@@ -29,6 +29,11 @@ export function OverviewDashboard() {
     queryFn: () => fetchReportSummary("24h"),
     refetchInterval: 60_000,
   });
+  const reportSitesQuery = useQuery({
+    queryKey: ["report-sites", "24h"],
+    queryFn: () => fetchReportSites("24h"),
+    refetchInterval: 60_000,
+  });
   const topIssueDevices = summaryQuery.data?.topDevicesByIssues || [];
   const criticalDevices = topIssueDevices.filter((device) => device.health === "critical").slice(0, 6);
   const staleCount = summaryQuery.data?.summary.staleDeviceCount ?? 0;
@@ -36,7 +41,21 @@ export function OverviewDashboard() {
   const activeAlarmCount = activeAlarmsQuery.data?.totalElements ?? 0;
   const alarmCriticalCount = (activeAlarmsQuery.data?.items || []).filter((a) => a.severity === "CRITICAL" || a.severity === "MAJOR").length;
   const recentAlarms = allAlarmsQuery.data?.items?.slice(0, 5) || [];
-  const siteMapItems: SiteMapItem[] = [];
+  const siteMapItems: SiteMapItem[] = (sitesQuery.data?.items || [])
+    .filter((site) => site.latitude !== undefined && site.longitude !== undefined && (site.latitude !== 0 || site.longitude !== 0))
+    .map((site) => {
+      const report = reportSitesQuery.data?.items.find((item) => item.siteKey === site.siteKey);
+      return {
+        siteKey: site.siteKey,
+        name: site.name,
+        latitude: site.latitude!,
+        longitude: site.longitude!,
+        deviceCount: report?.deviceCount ?? 0,
+        onlineDeviceCount: report?.onlineDeviceCount ?? 0,
+        activeAlarmCount: report?.activeAlarmCount ?? 0,
+        health: report?.health ?? "unknown",
+      };
+    });
   const missingCoordinateCount = (sitesQuery.data?.items.length || 0) - siteMapItems.length;
 
   return (

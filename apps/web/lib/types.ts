@@ -20,6 +20,9 @@ export type Site = {
   assetId: string;
   name: string;
   type: string;
+  latitude?: number;
+  longitude?: number;
+  region?: string;
 };
 
 export type SiteDevice = {

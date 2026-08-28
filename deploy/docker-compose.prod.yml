@@ -5,14 +5,17 @@ services:
     image: ${DOCKERHUB_NAMESPACE}/nms-dashboard-bff:${IMAGE_TAG}
     container_name: nms-bff
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
     environment:
       PORT: "8080"
-      THINGSBOARD_BASE_URL: "${THINGSBOARD_BASE_URL}"
+      THINGSBOARD_BASE_URL: "${THINGSBOARD_BASE_URL:-http://host.docker.internal:8081}"
       THINGSBOARD_API_KEY: "${THINGSBOARD_API_KEY}"
       THINGSBOARD_SITE_ASSET_TYPE: "${THINGSBOARD_SITE_ASSET_TYPE:-site}"
       CACHE_TTL_SECONDS: "${CACHE_TTL_SECONDS:-30}"
       CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS}"
+      PUBLIC_DEMO_MODE: "${PUBLIC_DEMO_MODE:-true}"
 
     ports:
       - "127.0.0.1:8080:8080"

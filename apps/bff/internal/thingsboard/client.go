@@ -174,7 +174,7 @@ func (c *Client) GetAssetAttributes(ctx context.Context, assetID string, keys []
 	query := url.Values{}
 	query.Set("keys", strings.Join(keys, ","))
 
-	var response []attributeKVResponse
+	var response attributeKVResponses
 	if err := c.getJSON(ctx, "/api/plugins/telemetry/ASSET/"+assetID+"/values/attributes", query, &response); err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func (c *Client) GetAssetAttributesWithBearer(ctx context.Context, bearerToken s
 	query := url.Values{}
 	query.Set("keys", strings.Join(keys, ","))
 
-	var response []attributeKVResponse
+	var response attributeKVResponses
 	if err := c.getJSONWithBearer(ctx, "/api/plugins/telemetry/ASSET/"+assetID+"/values/attributes", query, bearerToken, &response); err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (c *Client) GetEntityAttributes(ctx context.Context, entityType string, ent
 		query.Set("keys", strings.Join(keys, ","))
 	}
 
-	var response []attributeKVResponse
+	var response attributeKVResponses
 	if err := c.getJSON(ctx, "/api/plugins/telemetry/"+entityType+"/"+entityID+"/values/attributes/"+scope, query, &response); err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (c *Client) GetEntityAttributesWithBearer(ctx context.Context, bearerToken 
 	if len(keys) > 0 {
 		query.Set("keys", strings.Join(keys, ","))
 	}
-	var response []attributeKVResponse
+	var response attributeKVResponses
 	if err := c.getJSONWithBearer(ctx, "/api/plugins/telemetry/"+entityType+"/"+entityID+"/values/attributes/"+scope, query, bearerToken, &response); err != nil {
 		return nil, err
 	}
@@ -825,6 +825,29 @@ type attributeKVResponse struct {
 	Key          string `json:"key"`
 	Value        any    `json:"value"`
 	LastUpdateTs int64  `json:"lastUpdateTs"`
+}
+
+// ThingsBoard versions return attribute values either as a raw array or wrapped
+// in an object under "value". Accept both forms.
+type attributeKVResponses []attributeKVResponse
+
+func (r *attributeKVResponses) UnmarshalJSON(data []byte) error {
+	var items []attributeKVResponse
+	if len(data) > 0 && data[0] == '[' {
+		if err := json.Unmarshal(data, &items); err != nil {
+			return err
+		}
+		*r = items
+		return nil
+	}
+	var wrapped struct {
+		Value []attributeKVResponse `json:"value"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return err
+	}
+	*r = wrapped.Value
+	return nil
 }
 
 type relationInfoResponse struct {

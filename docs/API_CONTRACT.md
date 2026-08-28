@@ -351,6 +351,8 @@ If config is missing:
 
 * `PORT`: listen port. Default `8080`.
 * `THINGSBOARD_BASE_URL`: ThingsBoard base URL for BFF-only REST requests.
+* `PUBLIC_DEMO_MODE`: limits public site data to assets with `demo=true` and
+  includes optional site coordinate attributes in site responses.
 * `THINGSBOARD_API_KEY`: ThingsBoard tenant API key for BFF-only REST requests. Sent to ThingsBoard as `X-Authorization: ApiKey <value>` and never exposed to frontend.
 * `THINGSBOARD_SITE_ASSET_TYPE`: asset type used to discover sites. Default `site`.
 * `CACHE_TTL_SECONDS`: placeholder cache TTL config. Default `30`.

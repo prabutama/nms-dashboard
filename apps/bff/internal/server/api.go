@@ -1826,9 +1826,12 @@ func (s *apiServer) loadSites(ctx context.Context) ([]nms.Site, error) {
 
 	sites := make([]nms.Site, 0, len(assets))
 	for _, asset := range assets {
-		attributes, err := s.tbGetAssetAttributes(ctx, asset.ID, []string{"siteKey"})
+		attributes, err := s.tbGetAssetAttributes(ctx, asset.ID, []string{"siteKey", "latitude", "longitude", "region", "demo"})
 		if err != nil {
 			return nil, fmt.Errorf("load attributes for asset %s: %w", asset.ID, err)
+		}
+		if s.cfg.PublicDemoMode && !strings.EqualFold(attributes["demo"], "true") {
+			continue
 		}
 
 		siteKey := attributes["siteKey"]
@@ -1837,10 +1840,13 @@ func (s *apiServer) loadSites(ctx context.Context) ([]nms.Site, error) {
 		}
 
 		sites = append(sites, nms.Site{
-			SiteKey: siteKey,
-			AssetID: asset.ID,
-			Name:    asset.Name,
-			Type:    asset.Type,
+			SiteKey:   siteKey,
+			AssetID:   asset.ID,
+			Name:      asset.Name,
+			Type:      asset.Type,
+			Latitude:  parseCoordinate(attributes["latitude"], -90, 90),
+			Longitude: parseCoordinate(attributes["longitude"], -180, 180),
+			Region:    attributes["region"],
 		})
 	}
 
@@ -1849,6 +1855,14 @@ func (s *apiServer) loadSites(ctx context.Context) ([]nms.Site, error) {
 	})
 
 	return sites, nil
+}
+
+func parseCoordinate(value string, min, max float64) float64 {
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+	if err != nil || parsed < min || parsed > max {
+		return 0
+	}
+	return parsed
 }
 
 func slugify(value string) string {

@@ -1,10 +1,13 @@
 package nms
 
 type Site struct {
-	SiteKey string `json:"siteKey"`
-	AssetID string `json:"assetId"`
-	Name    string `json:"name"`
-	Type    string `json:"type"`
+	SiteKey   string  `json:"siteKey"`
+	AssetID   string  `json:"assetId"`
+	Name      string  `json:"name"`
+	Type      string  `json:"type"`
+	Latitude  float64 `json:"latitude,omitempty"`
+	Longitude float64 `json:"longitude,omitempty"`
+	Region    string  `json:"region,omitempty"`
 }
 
 type Device struct {

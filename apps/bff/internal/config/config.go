@@ -14,6 +14,7 @@ type Config struct {
 	CORSAllowedOrigins  []string
 	CacheTTLSeconds     int
 	HasThingsBoardSetup bool
+	PublicDemoMode      bool
 }
 
 func Load() Config {
@@ -35,6 +36,7 @@ func Load() Config {
 		CORSAllowedOrigins:  splitCSVEnv(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 		CacheTTLSeconds:     cacheTTLSeconds,
 		HasThingsBoardSetup: thingsBoardBaseURL != "" && thingsBoardAPIKey != "",
+		PublicDemoMode:      strings.EqualFold(getEnv("PUBLIC_DEMO_MODE", "false"), "true"),
 	}
 }
 

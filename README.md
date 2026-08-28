@@ -4,6 +4,11 @@ Custom NMS dashboard platform using ThingsBoard as backend source for telemetry,
 
 Phase 3 combines ThingsBoard telemetry and attributes into normalized NMS dashboard view models and a clean multi-page operations UI.
 
+Public multi-site demo target: three simulated sites, five simulated devices
+per site, site coordinates from ThingsBoard asset attributes, and one logical
+topology snapshot per site. The agent runs once in dummy mode; ThingsBoard
+relations remain authoritative for site membership.
+
 ## MVP decisions
 
 * stateless BFF
@@ -89,11 +94,12 @@ UI theme:
 
 ```env
 PORT=8080
-THINGSBOARD_BASE_URL=
+THINGSBOARD_BASE_URL=http://host.docker.internal:8081
 THINGSBOARD_API_KEY=
 THINGSBOARD_SITE_ASSET_TYPE=site
 CACHE_TTL_SECONDS=30
 CORS_ALLOWED_ORIGINS=http://localhost:3000
+PUBLIC_DEMO_MODE=true
 ```
 
 ### `apps/web`
@@ -118,6 +124,10 @@ cp .env.example .env
 ```
 
 `apps/bff` loads `.env` in local development as convenience only. Existing real environment variables still override file values.
+
+With `PUBLIC_DEMO_MODE=true`, public site responses include only ThingsBoard
+assets marked with `demo=true`. Site coordinates are read from asset
+attributes `latitude`, `longitude`, and `region`.
 
 ### Run frontend
 
@@ -226,7 +236,8 @@ NEXT_PUBLIC_API_BASE_URL=
 
 * `https://dash.prabutama.my.id/` -> `http://127.0.0.1:3001`
 * `https://dash.prabutama.my.id/api/` -> `http://127.0.0.1:8080`
-* `https://nms.prabutama.my.id/` -> `http://127.0.0.1:8081`
+* ThingsBoard listens on `:8081`.
+* BFF listens on `:8080`.
 
 ### Suggested rollout
 
