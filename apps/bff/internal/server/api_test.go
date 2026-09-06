@@ -1808,4 +1808,19 @@ func TestReportSummaryAndSitesAndDevices(t *testing.T) {
 	if alarmRequests != 1 {
 		t.Fatalf("expected shared report snapshot to load alarms once, got %d", alarmRequests)
 	}
+
+	req4 := adminAuthedRequest(http.MethodGet, "/api/v1/overview")
+	res4 := httptest.NewRecorder()
+	router.ServeHTTP(res4, req4)
+	if res4.Code != http.StatusOK {
+		t.Fatalf("overview: expected status 200, got %d", res4.Code)
+	}
+	for _, expected := range []string{`"summary"`, `"sites"`, `"devices"`, `"Overview report generated"`} {
+		if !strings.Contains(res4.Body.String(), expected) {
+			t.Fatalf("overview: expected %s in response: %s", expected, res4.Body.String())
+		}
+	}
+	if alarmRequests != 1 {
+		t.Fatalf("expected overview to reuse shared report snapshot, got %d alarm requests", alarmRequests)
+	}
 }

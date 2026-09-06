@@ -22,7 +22,7 @@ nms-dashboard/
 ├─ apps/
 │  ├─ bff/
 │  └─ web/
-├─ deploy/
+├─ deploy/                 # Docker Compose fallback and k3s manifests
 ├─ docs/
 └─ README.md
 ```
@@ -30,10 +30,26 @@ nms-dashboard/
 ## Request Flow
 
 ```txt
-Browser -> Next.js frontend -> BFF -> ThingsBoard
+Browser -> Cloudflare Tunnel -> Traefik Ingress
+							  ├─ /      -> nms-web Service -> Next.js
+							  └─ /api/  -> nms-bff Service -> ThingsBoard Service
 ```
 
 Frontend never sends ThingsBoard credentials and never calls ThingsBoard directly.
+
+## Production deployment
+
+The production target is k3s. The BFF runs in namespace `nms` and reaches
+ThingsBoard in namespace `thingsboard` through
+`thingsboard.thingsboard.svc.cluster.local:8080`. BFF and web are exposed as
+internal `ClusterIP` Services; Traefik owns the public host routing. The
+frontend image is built with an empty `NEXT_PUBLIC_API_BASE_URL`, so `/api`
+must be routed to the BFF without rewriting the path.
+
+Drone publishes immutable commit-SHA images. The server-side deployment script
+gets runtime credentials from Infisical, synchronizes Kubernetes Secrets, and
+waits for both Deployments to roll out. Docker Compose remains only as a
+temporary emergency fallback during migration.
 
 ## BFF
 

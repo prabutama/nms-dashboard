@@ -369,3 +369,8 @@ export type ReportDevicesResponse = {
   source?: string;
   message?: string;
 };
+
+export type ReportOverviewResponse = ReportSummaryResponse & {
+  sites: ReportSiteRow[];
+  devices: ReportDeviceRow[];
+};

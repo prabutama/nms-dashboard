@@ -4,6 +4,7 @@ import type {
   DeviceDashboardResponse,
   LatestTelemetryResponse,
   ReportDevicesResponse,
+  ReportOverviewResponse,
   ReportSitesResponse,
   ReportSummaryResponse,
   SiteDevicesResponse,
@@ -102,4 +103,9 @@ export function fetchReportDevices(range?: string, siteKey?: string) {
   if (siteKey) params.set("siteKey", siteKey);
   const qs = params.toString();
   return getJSON<ReportDevicesResponse>(`/api/v1/reports/devices${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchReportOverview(range?: string) {
+  const qs = range ? `?range=${encodeURIComponent(range)}` : "";
+  return getJSON<ReportOverviewResponse>(`/api/v1/overview${qs}`);
 }

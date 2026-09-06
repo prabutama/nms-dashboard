@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nms-dashboard
+  namespace: nms
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: dash.prabutama.my.id
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: nms-bff
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nms-web
+                port:
+                  name: http

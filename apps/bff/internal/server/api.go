@@ -167,6 +167,18 @@ type reportDevicesListResponse struct {
 	Message string                `json:"message,omitempty"`
 }
 
+type reportOverviewResponse struct {
+	Range              nms.ReportRange       `json:"range"`
+	Summary            nms.ReportSummaryKPI  `json:"summary"`
+	TopSitesByAlarms   []nms.ReportSiteRow   `json:"topSitesByAlarms"`
+	TopDevicesByIssues []nms.ReportDeviceRow `json:"topDevicesByIssues"`
+	Sites              []nms.ReportSiteRow   `json:"sites"`
+	Devices            []nms.ReportDeviceRow `json:"devices"`
+	GeneratedAt        string                `json:"generatedAt"`
+	Source             string                `json:"source,omitempty"`
+	Message            string                `json:"message,omitempty"`
+}
+
 type metricCatalogEntry struct {
 	Key        string
 	Label      string
@@ -229,6 +241,7 @@ func (s *apiServer) registerRoutes(r chi.Router) {
 		r.With(s.cacheGetResponse(30*time.Second)).Get("/reports/summary", s.reportsSummaryHandler())
 		r.With(s.cacheGetResponse(30*time.Second)).Get("/reports/sites", s.reportsSitesHandler())
 		r.With(s.cacheGetResponse(30*time.Second)).Get("/reports/devices", s.reportsDevicesHandler())
+		r.With(s.cacheGetResponse(30*time.Second)).Get("/overview", s.reportOverviewHandler())
 	})
 }
 
@@ -1428,6 +1441,7 @@ type reportsSnapshot struct {
 	rangeLabel         string
 	reportRange        nms.ReportRange
 	sites              []nms.Site
+	siteRows           []nms.ReportSiteRow
 	summary            nms.ReportSummaryKPI
 	topSitesByAlarms   []nms.ReportSiteRow
 	topDevicesByIssues []nms.ReportDeviceRow
@@ -1509,12 +1523,16 @@ func (s *apiServer) reportsSnapshotCacheKey(r *http.Request) string {
 }
 
 func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (*reportsSnapshot, error) {
+	startedAt := time.Now()
 	rangeLabel, startMs, endMs := parseReportRange(r)
+	sitesStartedAt := time.Now()
 	sites, err := s.loadSites(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("load sites: %w", err)
 	}
+	sitesDuration := time.Since(sitesStartedAt)
 
+	alarmsStartedAt := time.Now()
 	alarmQuery := thingsboard.AlarmQuery{
 		Page:         0,
 		PageSize:     200,
@@ -1540,6 +1558,7 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 			}
 		}
 	}
+	alarmsDuration := time.Since(alarmsStartedAt)
 
 	totalDeviceCount := 0
 	onlineCount := 0
@@ -1548,6 +1567,7 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 	deviceIssues := make([]deviceIssueInfo, 0)
 	deviceRows := make([]nms.ReportDeviceRow, 0)
 	now := time.Now().UTC()
+	telemetryStartedAt := time.Now()
 
 	for _, site := range sites {
 		devices, err := s.loadSiteDevices(ctx, site)
@@ -1706,6 +1726,7 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 
 		siteRows = append(siteRows, nms.ReportSiteRow{SiteKey: site.SiteKey, SiteName: site.Name, DeviceCount: siteDeviceCount, OnlineDeviceCount: siteOnlineCount, StaleDeviceCount: siteStaleCount, ActiveAlarmCount: siteAlarmCount, CriticalAlarmCount: siteCriticalCount, Health: siteHealth, LastUpdatedAt: now.Format(time.RFC3339)})
 	}
+	telemetryDuration := time.Since(telemetryStartedAt)
 
 	sort.Slice(siteRows, func(i, j int) bool { return siteRows[i].ActiveAlarmCount > siteRows[j].ActiveAlarmCount })
 	sort.Slice(deviceIssues, func(i, j int) bool { return deviceIssues[i].score > deviceIssues[j].score })
@@ -1725,16 +1746,55 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 
 	endAt := now
 	startAt := endAt.Add(-reportRangeDuration(rangeLabel))
+	s.logger.Info("reports snapshot built", "range", rangeLabel, "sites", len(sites), "devices", totalDeviceCount, "sitesDuration", sitesDuration, "alarmsDuration", alarmsDuration, "telemetryDuration", telemetryDuration, "totalDuration", time.Since(startedAt))
 	return &reportsSnapshot{
 		rangeLabel:         rangeLabel,
 		reportRange:        nms.ReportRange{Label: rangeLabel, StartAt: startAt.Format(time.RFC3339), EndAt: endAt.Format(time.RFC3339)},
 		sites:              sites,
+		siteRows:           siteRows,
 		summary:            nms.ReportSummaryKPI{SiteCount: len(sites), DeviceCount: totalDeviceCount, OnlineDeviceCount: onlineCount, StaleDeviceCount: staleCount, ActiveAlarmCount: activeAlarmCount, CriticalAlarmCount: criticalAlarmCount},
 		topSitesByAlarms:   siteRows,
 		topDevicesByIssues: topDevices,
 		allDevices:         deviceRows,
 		generatedAt:        now.Format(time.RFC3339),
 	}, nil
+}
+
+func (s *apiServer) reportOverviewHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.tb == nil {
+			writeJSON(w, http.StatusOK, reportOverviewResponse{
+				Sites:   []nms.ReportSiteRow{},
+				Devices: []nms.ReportDeviceRow{},
+				Source:  "thingsboard",
+				Message: "ThingsBoard integration not configured",
+			})
+			return
+		}
+
+		snapshot, err := s.getReportsSnapshot(r.Context(), r)
+		if err != nil {
+			writeJSON(w, http.StatusOK, reportOverviewResponse{
+				Sites:   []nms.ReportSiteRow{},
+				Devices: []nms.ReportDeviceRow{},
+				Source:  "thingsboard",
+				Message: "ThingsBoard configured but reports could not be loaded",
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, reportOverviewResponse{
+			Range:              snapshot.reportRange,
+			Summary:            snapshot.summary,
+			TopSitesByAlarms:   snapshot.topSitesByAlarms,
+			TopDevicesByIssues: snapshot.topDevicesByIssues,
+			Sites:              snapshot.siteRows,
+			Devices:            snapshot.allDevices,
+			GeneratedAt:        snapshot.generatedAt,
+			Source:             "thingsboard",
+			Message:            "Overview report generated",
+		})
+	}
 }
 
 func (s *apiServer) loadLatestTelemetryBatch(ctx context.Context, devices []nms.Device) map[string]deviceTelemetrySnapshot {

@@ -24,7 +24,7 @@ relations remain authoritative for site membership.
 apps/
   bff/   Go BFF API service
   web/   Next.js frontend
-deploy/  Docker Compose files
+deploy/  Docker Compose and k3s deployment files
 docs/    Architecture and API docs
 ```
 
@@ -214,8 +214,12 @@ recommended split is:
 
 CI/CD deployment uses these files:
 
-* `deploy/docker-compose.prod.yml` — production runtime services from Docker Hub images
-* `deploy/deploy-prod.sh` — server-side deploy, health check, and rollback script
+* `deploy/01-secret.yaml` — k3s namespace and secret bootstrap resource
+* `deploy/02-deployment.yaml` — BFF and web Deployments
+* `deploy/03-service.yaml` — internal ClusterIP Services
+* `deploy/04-ingress.yaml` — Traefik host and `/api` routing
+* `deploy/deploy-prod.sh` — server-side k3s deploy, rollout check, and rollback script
+* `deploy/docker-compose.prod.yml` — legacy Compose fallback during migration
 * `deploy/infisical-auth.env.example` — example server auth file for Infisical Universal Auth
 
 ### Production env guidance
@@ -239,16 +243,52 @@ NEXT_PUBLIC_API_BASE_URL=
 * ThingsBoard listens on `:8081`.
 * BFF listens on `:8080`.
 
+### k3s production deployment
+
+Production now runs in the `nms` namespace on k3s. ThingsBoard remains in the
+`thingsboard` namespace and the BFF uses the Kubernetes Service DNS name:
+
+```env
+THINGSBOARD_BASE_URL=http://thingsboard.thingsboard.svc.cluster.local:8080
+```
+
+The deployment script reads runtime values from Infisical, creates or updates
+the Kubernetes BFF Secret and private Docker Hub image pull Secret, then
+applies the manifests with an immutable Drone commit SHA. The deployment host
+must provide `kubectl` and `/etc/rancher/k3s/k3s.yaml`.
+
+Cloudflare Tunnel should forward the dashboard hostname to the k3s Traefik
+entrypoint. Traefik preserves the public same-origin contract:
+
+* `/` -> `nms-web:3000`
+* `/api/` -> `nms-bff:8080`
+
+Do not rewrite `/api`; the BFF expects paths such as `/api/v1/health`.
+
+The manifests contain image placeholders and are rendered by
+`deploy-prod.sh`. Bootstrap the namespace and runtime secrets through that
+script rather than applying `02-deployment.yaml` directly:
+
+```bash
+sudo /opt/nms-dashboard/deploy-prod.sh "$DRONE_COMMIT_SHA"
+```
+
+The normal CI path is:
+
+```bash
+sudo /opt/nms-dashboard/deploy-prod.sh "$DRONE_COMMIT_SHA"
+```
+
 ### Suggested rollout
 
 1. Create DNS for `dash.prabutama.my.id`
 2. Ensure TLS certificate covers `dash.prabutama.my.id`
 3. Create `/opt/nms-dashboard` on the server
 4. Create `/etc/nms-dashboard/infisical-auth.env` from `deploy/infisical-auth.env.example`
-5. Ensure Docker, Docker Compose, and Infisical CLI are installed on the server
-6. Ensure external Docker network from `NMS_DOCKER_NETWORK` exists
-7. Configure Cloudflare Tunnel to route `/` to `127.0.0.1:3001` and `/api/` to `127.0.0.1:8080`
-8. Let Drone copy `docker-compose.prod.yml` and `deploy-prod.sh`, then run production deploy
+5. Ensure k3s, Traefik, `kubectl`, and Infisical CLI are installed on the server
+6. Ensure the Infisical runtime path contains the ThingsBoard API key and Docker Hub read token
+7. Configure Cloudflare Tunnel to route the dashboard hostname to Traefik
+8. Let Drone copy the k3s manifests and `deploy-prod.sh`, then run the rollout
 9. Validate public read-only dashboard, sites, devices, alarms, and reports
 * `THINGSBOARD_API_KEY` stays runtime-only and is not baked into images.
 

@@ -178,6 +178,24 @@ Status: complete.
 * authentication
 * user preferences
 
+## Phase 8: k3s production migration
+
+Status: in progress.
+
+Delivered so far:
+
+* k3s namespace, Deployment, ClusterIP Service, and Traefik Ingress manifests
+* BFF-to-ThingsBoard Kubernetes Service DNS configuration
+* Infisical-backed server deployment script with image SHA rollout and rollback
+* Drone deployment step updated to copy and apply k3s resources
+
+Remaining rollout work:
+
+* verify External Secrets or the current Infisical bootstrap path on the target cluster
+* verify private Docker Hub image pull credentials
+* route Cloudflare Tunnel to Traefik
+* execute internal and public smoke tests before retiring Compose
+
 ### Phase 8: Reporting
 
 Status: complete after validation.

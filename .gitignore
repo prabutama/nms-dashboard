@@ -12,3 +12,6 @@ bin/
 .env.test.local
 .env.production.local
 deploy/infisical-auth.env
+prod-runtime.env
+prod-ci.env
+*.env

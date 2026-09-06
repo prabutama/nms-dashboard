@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nms-bff
+  namespace: nms
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: nms-bff
+  template:
+    metadata:
+      labels:
+        app: nms-bff
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-registry
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: nms-bff
+          image: __DOCKERHUB_NAMESPACE__/nms-dashboard-bff:__IMAGE_TAG__
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: THINGSBOARD_BASE_URL
+              value: "http://thingsboard.thingsboard.svc.cluster.local:8080"
+            - name: THINGSBOARD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nms-bff-secrets
+                  key: THINGSBOARD_API_KEY
+            - name: THINGSBOARD_SITE_ASSET_TYPE
+              value: "site"
+            - name: CACHE_TTL_SECONDS
+              value: "30"
+            - name: CORS_ALLOWED_ORIGINS
+              value: "https://dash.prabutama.my.id"
+            - name: PUBLIC_DEMO_MODE
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nms-web
+  namespace: nms
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: nms-web
+  template:
+    metadata:
+      labels:
+        app: nms-web
+    spec:
+      imagePullSecrets:
+        - name: dockerhub-registry
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: nms-web
+          image: __DOCKERHUB_NAMESPACE__/nms-dashboard-web:__IMAGE_TAG__
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi

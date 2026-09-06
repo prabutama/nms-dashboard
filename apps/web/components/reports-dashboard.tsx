@@ -6,7 +6,7 @@ import { useCallback } from "react";
 
 import { DashboardShell } from "@/components/dashboard-shell";
 import { StatCard, StatusBadge } from "@/components/nms-ui";
-import { fetchReportDevices, fetchReportSites, fetchReportSummary } from "@/lib/api";
+import { fetchReportOverview } from "@/lib/api";
 import type { ReportDeviceRow, ReportSiteRow } from "@/lib/types";
 
 const RANGES = [
@@ -147,24 +147,14 @@ export function ReportsDashboard() {
     [router, searchParams],
   );
 
-  const summaryQuery = useQuery({
-    queryKey: ["reports-summary", range],
-    queryFn: () => fetchReportSummary(range),
-    refetchInterval: 60_000,
-  });
-  const sitesQuery = useQuery({
-    queryKey: ["reports-sites", range],
-    queryFn: () => fetchReportSites(range),
-    refetchInterval: 60_000,
-  });
-  const devicesQuery = useQuery({
-    queryKey: ["reports-devices", range],
-    queryFn: () => fetchReportDevices(range),
+  const overviewQuery = useQuery({
+    queryKey: ["reports-overview", range],
+    queryFn: () => fetchReportOverview(range),
     refetchInterval: 60_000,
   });
 
-  const siteRows = sitesQuery.data?.items || [];
-  const deviceRows = devicesQuery.data?.items || [];
+  const siteRows = overviewQuery.data?.sites || [];
+  const deviceRows = overviewQuery.data?.devices || [];
 
   const handleExportSitesCSV = () => {
     if (siteRows.length === 0) return;
@@ -195,14 +185,14 @@ export function ReportsDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {summaryQuery.data?.generatedAt ? <span className="text-[11px] text-slate-600">Generated {new Date(summaryQuery.data.generatedAt).toLocaleString()}</span> : null}
+            {overviewQuery.data?.generatedAt ? <span className="text-[11px] text-slate-600">Generated {new Date(overviewQuery.data.generatedAt).toLocaleString()}</span> : null}
           </div>
         </div>
 
-        {summaryQuery.error ? <p className="border border-red-200 bg-red-100 px-4 py-3 text-sm text-red-800">{summaryQuery.error.message}</p> : null}
-        {summaryQuery.isLoading ? <p className="py-4 text-xs text-slate-600">Loading report data...</p> : null}
+        {overviewQuery.error ? <p className="border border-red-200 bg-red-100 px-4 py-3 text-sm text-red-800">{overviewQuery.error.message}</p> : null}
+        {overviewQuery.isLoading ? <p className="py-4 text-xs text-slate-600">Loading report data...</p> : null}
 
-        <SummaryStrip data={summaryQuery.data} />
+        <SummaryStrip data={overviewQuery.data} />
 
         <div className="border border-slate-300 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-4 py-3">
