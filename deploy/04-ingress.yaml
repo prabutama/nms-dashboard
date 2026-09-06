@@ -23,3 +23,22 @@ spec:
                 name: nms-web
                 port:
                   name: http
+    - host: nms.mataelang.net
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: nms-bff
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: nms-web
+                port:
+                  name: http
+                  
+                  
