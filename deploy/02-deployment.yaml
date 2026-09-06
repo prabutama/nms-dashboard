@@ -43,7 +43,7 @@ spec:
             - name: CACHE_TTL_SECONDS
               value: "30"
             - name: CORS_ALLOWED_ORIGINS
-              value: "https://dash.prabutama.my.id"
+              value: "https://dash.prabutama.my.id,https://nms.mataelang.net"
             - name: PUBLIC_DEMO_MODE
               value: "true"
           readinessProbe:
