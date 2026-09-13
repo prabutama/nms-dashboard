@@ -4,8 +4,9 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
 import { DashboardShell } from "@/components/dashboard-shell";
-import { StatCard, StatusBadge } from "@/components/nms-ui";
+import { FreshnessStrip, StatCard, StatusBadge } from "@/components/nms-ui";
 import { fetchReportSites, fetchReportSummary, fetchSites } from "@/lib/api";
+import { freshnessState } from "@/lib/format";
 
 export function SitesDashboard() {
   const sitesQuery = useQuery({ queryKey: ["sites"], queryFn: fetchSites, refetchInterval: 60_000 });
@@ -21,6 +22,8 @@ export function SitesDashboard() {
   });
   const reportSites = reportSitesQuery.data?.items || [];
   const totalAlarms = summaryQuery.data?.summary.activeAlarmCount ?? 0;
+  const latestUpdate = reportSites.map((site) => site.lastUpdatedAt).sort().at(-1);
+  const currentCount = reportSites.filter((site) => freshnessState(site.lastUpdatedAt) === "current").length;
 
   return (
     <DashboardShell title="Sites" subtitle="Monitored locations and site-level inventory.">
@@ -29,9 +32,10 @@ export function SitesDashboard() {
         <StatCard title="Devices" value={summaryQuery.data?.summary.deviceCount ?? 0} note="Across all sites" />
         <StatCard title="Alarms" value={totalAlarms} note="Across all sites" status={totalAlarms > 0 ? "warning" : "normal"} />
       </div>
+      <FreshnessStrip updatedAt={latestUpdate} currentCount={currentCount} totalCount={reportSites.length} />
 
-      <div className="border border-slate-300 bg-white shadow-sm">
-        <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+       <div className="rounded-md border border-slate-300 bg-white shadow-sm">
+         <div className="rounded-t-md border-b border-slate-300 bg-slate-100 px-4 py-3">
           <p className="text-xs font-semibold text-slate-800">Site Inventory</p>
           <p className="mt-0.5 text-[11px] text-slate-600">Select a site to view devices and summary.</p>
         </div>

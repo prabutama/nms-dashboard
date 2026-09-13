@@ -4,8 +4,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { DashboardShell } from "@/components/dashboard-shell";
-import { DeviceLink, StatCard } from "@/components/nms-ui";
+import { DeviceLink, FreshnessStrip, StatCard } from "@/components/nms-ui";
 import { fetchReportDevices, fetchReportSummary } from "@/lib/api";
+import { freshnessState } from "@/lib/format";
 
 export function DevicesDashboard() {
   const [search, setSearch] = useState("");
@@ -30,6 +31,8 @@ export function DevicesDashboard() {
     const matchesSite = site === "all" || device.siteKey === site;
     return matchesSearch && matchesHealth && matchesSite;
   }), [devices, health, search, site]);
+  const latestUpdate = devices.map((device) => device.updatedAt).sort().at(-1);
+  const currentCount = devices.filter((device) => freshnessState(device.updatedAt) === "current").length;
 
   return (
     <DashboardShell title="Devices" subtitle="All monitored devices discovered from site relations.">
@@ -38,15 +41,16 @@ export function DevicesDashboard() {
         <StatCard title="Online" value={summaryQuery.data?.summary.onlineDeviceCount ?? 0} note="Reachability based" status="normal" />
         <StatCard title="Stale" value={summaryQuery.data?.summary.staleDeviceCount ?? 0} note="Telemetry older than 5 min" status={summaryQuery.data?.summary.staleDeviceCount ? "warning" : "normal"} />
       </section>
+      <FreshnessStrip updatedAt={latestUpdate} currentCount={currentCount} totalCount={devices.length} />
 
-      <section className="border border-slate-300 bg-white shadow-sm">
+       <section className="rounded-md border border-slate-300 bg-white shadow-sm">
         <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><p className="text-xs font-semibold text-slate-800">Device Inventory</p><p className="mt-0.5 text-[11px] text-slate-600">{filteredDevices.length} of {devices.length} devices</p></div>
             <div className="flex flex-wrap gap-2">
-              <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search device..." className="w-48 border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-700" />
-              <select value={site} onChange={(event) => setSite(event.target.value)} className="border border-slate-300 bg-white px-2 py-1.5 text-xs"><option value="all">All sites</option>{sites.map((item) => <option key={item} value={item}>{item}</option>)}</select>
-              <select value={health} onChange={(event) => setHealth(event.target.value)} className="border border-slate-300 bg-white px-2 py-1.5 text-xs"><option value="all">All health</option><option value="normal">Normal</option><option value="warning">Warning</option><option value="critical">Critical</option><option value="unknown">Unknown</option></select>
+               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search device..." className="w-48 rounded-sm border border-slate-300 bg-white px-2 py-1.5 text-xs outline-none focus:border-blue-700" />
+               <select value={site} onChange={(event) => setSite(event.target.value)} className="rounded-sm border border-slate-300 bg-white px-2 py-1.5 text-xs"><option value="all">All sites</option>{sites.map((item) => <option key={item} value={item}>{item}</option>)}</select>
+               <select value={health} onChange={(event) => setHealth(event.target.value)} className="rounded-sm border border-slate-300 bg-white px-2 py-1.5 text-xs"><option value="all">All health</option><option value="normal">Normal</option><option value="warning">Warning</option><option value="critical">Critical</option><option value="unknown">Unknown</option></select>
             </div>
           </div>
         </div>

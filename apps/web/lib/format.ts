@@ -55,6 +55,19 @@ export function formatRelativeTime(value?: string): string {
   return `${Math.floor(diffHours / 24)}d ago`;
 }
 
+export function freshnessState(value?: string, staleAfterSeconds = 300): "current" | "stale" | "unknown" {
+  if (!value) return "unknown";
+  const timestamp = new Date(value).getTime();
+  if (Number.isNaN(timestamp)) return "unknown";
+  return Date.now() - timestamp <= staleAfterSeconds * 1000 ? "current" : "stale";
+}
+
+export function freshnessLabel(value?: string, staleAfterSeconds = 300): string {
+  const state = freshnessState(value, staleAfterSeconds);
+  if (state === "unknown") return "No data";
+  return state === "current" ? `Updated ${formatRelativeTime(value)}` : `Stale ${formatRelativeTime(value)}`;
+}
+
 export function formatDateTime(value?: string): string {
   if (!value) return "unknown";
   const date = new Date(value);

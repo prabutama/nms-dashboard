@@ -173,18 +173,18 @@ export function ReportsDashboard() {
   return (
     <DashboardShell title="Reports" subtitle="Periodic performance, health, and alarm summary.">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-3 rounded-md border border-slate-300 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-semibold text-slate-700">Period:</span>
-            <div className="flex gap-px">
+            <div className="flex flex-wrap gap-1">
               {RANGES.map((r) => (
-                <button key={r.value} onClick={() => setRange(r.value)} className={`border px-3 py-1.5 text-xs font-medium transition ${range === r.value ? "border-blue-800 bg-blue-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}>
+                  <button key={r.value} onClick={() => setRange(r.value)} className={`rounded-sm border px-3 py-1.5 text-xs font-medium transition ${range === r.value ? "border-blue-800 bg-blue-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}>
                   {r.label}
                 </button>
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:justify-end">
             {overviewQuery.data?.generatedAt ? <span className="text-[11px] text-slate-600">Generated {new Date(overviewQuery.data.generatedAt).toLocaleString()}</span> : null}
           </div>
         </div>
@@ -194,8 +194,8 @@ export function ReportsDashboard() {
 
         <SummaryStrip data={overviewQuery.data} />
 
-        <div className="border border-slate-300 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-4 py-3">
+        <div className="rounded-md border border-slate-300 bg-white shadow-sm">
+          <div className="flex items-center justify-between rounded-t-md border-b border-slate-300 bg-slate-100 px-4 py-3">
             <div>
               <p className="text-xs font-semibold text-slate-800">Sites Report</p>
               <p className="mt-0.5 text-[11px] text-slate-600">Per-site device counts, alarm counts, and health.</p>
@@ -206,11 +206,11 @@ export function ReportsDashboard() {
               </button>
             ) : null}
           </div>
-          <SitesTable rows={siteRows} />
+          <div className="overflow-x-auto"><SitesTable rows={siteRows} /></div>
         </div>
 
-        <div className="border border-slate-300 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-4 py-3">
+        <div className="rounded-md border border-slate-300 bg-white shadow-sm">
+          <div className="flex items-center justify-between rounded-t-md border-b border-slate-300 bg-slate-100 px-4 py-3">
             <div>
               <p className="text-xs font-semibold text-slate-800">Devices Report</p>
               <p className="mt-0.5 text-[11px] text-slate-600">Per-device health, alarm count, and key metrics.</p>
@@ -221,7 +221,7 @@ export function ReportsDashboard() {
               </button>
             ) : null}
           </div>
-          <DevicesTable rows={deviceRows} showSiteKey />
+          <div className="overflow-x-auto"><DevicesTable rows={deviceRows} showSiteKey /></div>
         </div>
       </div>
     </DashboardShell>

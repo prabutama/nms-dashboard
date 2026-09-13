@@ -1,9 +1,17 @@
 import type { Metadata } from "next";
+import { Poppins } from "next/font/google";
 import "leaflet/dist/leaflet.css";
 
 import "./globals.css";
 
 import { QueryProvider } from "@/components/query-provider";
+
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-poppins",
+});
 
 export const metadata: Metadata = {
 	title: "NMS Dashboard",
@@ -17,7 +25,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={poppins.variable}>
       <body>
         <QueryProvider>
           {children}
