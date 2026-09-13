@@ -256,10 +256,18 @@ func (s *apiServer) registerRoutes(r chi.Router) {
 }
 
 func (s *apiServer) healthHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		status := http.StatusOK
+		serviceStatus := "ok"
+		if s.cfg.DataSource == "postgres" {
+			if s.local == nil || s.local.db.Ping(r.Context()) != nil {
+				status = http.StatusServiceUnavailable
+				serviceStatus = "degraded"
+			}
+		}
 		response := healthResponse{
 			Service:   "nms-bff",
-			Status:    "ok",
+			Status:    serviceStatus,
 			Timestamp: time.Now().UTC().Format(time.RFC3339),
 			Version:   "phase-2",
 			Phase:     "thingsboard-sites",
@@ -277,7 +285,7 @@ func (s *apiServer) healthHandler() http.HandlerFunc {
 			},
 		}
 
-		writeJSON(w, http.StatusOK, response)
+		writeJSON(w, status, response)
 	}
 }
 
