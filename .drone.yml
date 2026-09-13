@@ -157,6 +157,7 @@ steps:
               deploy/02-deployment.yaml \
               deploy/03-service.yaml \
               deploy/04-ingress.yaml \
+              deploy/05-postgres.yaml \
               deploy/deploy-prod.sh \
               "$DEPLOY_USER@$DEPLOY_HOST:/opt/nms-dashboard/"
 

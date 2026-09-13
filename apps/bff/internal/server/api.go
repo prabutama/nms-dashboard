@@ -31,6 +31,7 @@ type apiServer struct {
 	cfg           config.Config
 	logger        *slog.Logger
 	tb            *thingsboard.Client
+	local         *localStore
 	cache         *memoryCache
 	reportsMu     sync.Mutex
 	reportsCache  map[string]reportsSnapshotCacheEntry
@@ -214,6 +215,14 @@ func newAPIServer(cfg config.Config, logger *slog.Logger) *apiServer {
 			server.tb = client
 		}
 	}
+	if cfg.DataSource == "postgres" || cfg.DatabaseURL != "" {
+		store, err := openLocalStore(context.Background(), cfg)
+		if err != nil {
+			logger.Error("postgres store initialization failed", "error", err)
+		} else {
+			server.local = store
+		}
+	}
 
 	return server
 }
@@ -242,6 +251,7 @@ func (s *apiServer) registerRoutes(r chi.Router) {
 		r.With(s.cacheGetResponse(30*time.Second)).Get("/reports/sites", s.reportsSitesHandler())
 		r.With(s.cacheGetResponse(30*time.Second)).Get("/reports/devices", s.reportsDevicesHandler())
 		r.With(s.cacheGetResponse(30*time.Second)).Get("/overview", s.reportOverviewHandler())
+		r.Post("/ingest/telemetry", s.ingestTelemetryHandler())
 	})
 }
 
@@ -261,11 +271,52 @@ func (s *apiServer) healthHandler() http.HandlerFunc {
 				"thingsBoardConfigured":    s.cfg.HasThingsBoardSetup,
 				"thingsBoardClientEnabled": s.tb != nil,
 				"thingsBoardSiteAssetType": s.cfg.ThingsBoardSiteType,
+				"dataSource":               s.cfg.DataSource,
+				"postgresEnabled":          s.local != nil,
 				"corsAllowedOrigins":       s.cfg.CORSAllowedOrigins,
 			},
 		}
 
 		writeJSON(w, http.StatusOK, response)
+	}
+}
+
+func (s *apiServer) useLocalStore() bool {
+	return s.cfg.DataSource == "postgres" && s.local != nil
+}
+
+func (s *apiServer) activeSource() string {
+	if s.useLocalStore() {
+		return "postgres"
+	}
+	return "thingsboard"
+}
+
+func (s *apiServer) ingestTelemetryHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if s.local == nil {
+			writeError(w, http.StatusServiceUnavailable, "PostgreSQL store not configured")
+			return
+		}
+		if s.cfg.IngestAPIKey == "" {
+			writeError(w, http.StatusServiceUnavailable, "ingest API key not configured")
+			return
+		}
+		if got := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "); got != s.cfg.IngestAPIKey {
+			writeError(w, http.StatusUnauthorized, "invalid ingest token")
+			return
+		}
+		var req ingestRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+		if err := s.local.IngestTelemetry(r.Context(), req); err != nil {
+			s.logger.Warn("ingest telemetry failed", "error", err)
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusAccepted, ingestResponse{OK: true, Items: len(req.Items), Source: "postgres", Message: "Telemetry ingested"})
 	}
 }
 
@@ -295,6 +346,19 @@ func (s *apiServer) thingsBoardStatusHandler() http.HandlerFunc {
 
 func (s *apiServer) alarmsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if s.useLocalStore() {
+			page := parseIntQuery(r, "page", 0)
+			pageSize := parseIntQuery(r, "pageSize", 20)
+			alarmPage, err := s.local.ListAlarms(r.Context(), "", r.URL.Query().Get("searchStatus"), page, pageSize)
+			if err != nil {
+				s.logger.Warn("load local alarms failed", "error", err)
+				writeJSON(w, http.StatusOK, alarmsResponse{AlarmPage: nms.AlarmPage{Items: []nms.Alarm{}}, Source: "postgres", Message: "PostgreSQL alarms could not be loaded"})
+				return
+			}
+			writeJSON(w, http.StatusOK, alarmsResponse{AlarmPage: alarmPage, Source: "postgres", Message: "Alarms loaded from PostgreSQL"})
+			return
+		}
+
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, alarmsResponse{
 				AlarmPage: nms.AlarmPage{Items: []nms.Alarm{}},
@@ -463,6 +527,17 @@ func tsOrEmpty(ts int64) string {
 
 func (s *apiServer) sitesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if s.useLocalStore() {
+			sites, err := s.loadSites(r.Context())
+			if err != nil {
+				s.logger.Warn("load local sites failed", "error", err)
+				writeJSON(w, http.StatusOK, sitesResponse{Items: []nms.Site{}, Source: "postgres", Message: "PostgreSQL sites could not be loaded"})
+				return
+			}
+			writeJSON(w, http.StatusOK, sitesResponse{Items: sites, Source: "postgres", Message: "Sites loaded from PostgreSQL"})
+			return
+		}
+
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, sitesResponse{
 				Items:   []nms.Site{},
@@ -499,6 +574,16 @@ func (s *apiServer) sitesHandler() http.HandlerFunc {
 func (s *apiServer) siteDevicesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteKey := chi.URLParam(r, "siteKey")
+		if s.useLocalStore() {
+			devices, err := s.loadSiteDevices(r.Context(), nms.Site{SiteKey: siteKey})
+			if err != nil {
+				s.logger.Warn("load local site devices failed", "siteKey", siteKey, "error", err)
+				writeJSON(w, http.StatusOK, siteDevicesResponse{SiteKey: siteKey, Items: []nms.Device{}, Source: "postgres", Message: "PostgreSQL devices could not be loaded"})
+				return
+			}
+			writeJSON(w, http.StatusOK, siteDevicesResponse{SiteKey: siteKey, Items: devices, Source: "postgres", Message: "Devices loaded from PostgreSQL"})
+			return
+		}
 
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, siteDevicesResponse{
@@ -564,6 +649,30 @@ func (s *apiServer) siteDevicesHandler() http.HandlerFunc {
 func (s *apiServer) siteAlarmsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteKey := chi.URLParam(r, "siteKey")
+		if s.useLocalStore() {
+			devices, err := s.local.ListSiteDevices(r.Context(), siteKey)
+			if err != nil {
+				writeJSON(w, http.StatusOK, alarmsResponse{AlarmPage: nms.AlarmPage{Items: []nms.Alarm{}}, Source: "postgres", Message: "PostgreSQL site alarms could not be loaded"})
+				return
+			}
+			seen := map[string]bool{}
+			items := []nms.Alarm{}
+			for _, device := range devices {
+				page, err := s.local.ListAlarms(r.Context(), device.DeviceID, r.URL.Query().Get("searchStatus"), 0, 50)
+				if err != nil {
+					continue
+				}
+				for _, alarm := range page.Items {
+					if !seen[alarm.AlarmID] {
+						seen[alarm.AlarmID] = true
+						items = append(items, alarm)
+					}
+				}
+			}
+			sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt > items[j].CreatedAt })
+			writeJSON(w, http.StatusOK, alarmsResponse{AlarmPage: nms.AlarmPage{Items: items, TotalElements: int64(len(items))}, Source: "postgres", Message: "Site alarms loaded from PostgreSQL"})
+			return
+		}
 
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, alarmsResponse{
@@ -658,6 +767,16 @@ func (s *apiServer) siteAlarmsHandler() http.HandlerFunc {
 func (s *apiServer) deviceAlarmsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		deviceID := chi.URLParam(r, "deviceId")
+		if s.useLocalStore() {
+			alarmPage, err := s.local.ListAlarms(r.Context(), deviceID, r.URL.Query().Get("searchStatus"), parseIntQuery(r, "page", 0), parseIntQuery(r, "pageSize", 20))
+			if err != nil {
+				s.logger.Warn("load local device alarms failed", "deviceId", deviceID, "error", err)
+				writeJSON(w, http.StatusOK, alarmsResponse{AlarmPage: nms.AlarmPage{Items: []nms.Alarm{}}, Source: "postgres", Message: "PostgreSQL alarms could not be loaded"})
+				return
+			}
+			writeJSON(w, http.StatusOK, alarmsResponse{AlarmPage: alarmPage, Source: "postgres", Message: "Device alarms loaded from PostgreSQL"})
+			return
+		}
 
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, alarmsResponse{
@@ -721,6 +840,25 @@ func (s *apiServer) deviceAlarmsHandler() http.HandlerFunc {
 func (s *apiServer) siteTopologyHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		siteKey := chi.URLParam(r, "siteKey")
+		if s.useLocalStore() {
+			sites, _ := s.local.ListSites(r.Context())
+			info := nms.SiteTopologySiteInfo{SiteKey: siteKey, AssetID: siteKey, Name: siteKey, Type: "site"}
+			for _, site := range sites {
+				if site.SiteKey == siteKey {
+					info.Name = site.Name
+					info.Type = site.Type
+					break
+				}
+			}
+			snapshot, err := s.local.TopologySnapshot(r.Context(), siteKey)
+			if err == nil {
+				topology := parseSiteTopologySnapshot(attributesFromMap(snapshot))
+				writeJSON(w, http.StatusOK, nms.SiteTopologyResponse{Site: info, Topology: topology, Source: "postgres", Message: "Site topology loaded from PostgreSQL"})
+				return
+			}
+			writeJSON(w, http.StatusOK, nms.SiteTopologyResponse{Site: info, Topology: nms.SiteTopology{Nodes: []nms.SiteTopologyNode{}, Edges: []nms.SiteTopologyEdge{}}, Source: "postgres", Message: "No topology snapshot available for site"})
+			return
+		}
 
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, nms.SiteTopologyResponse{
@@ -941,6 +1079,12 @@ func parseSiteTopologySnapshot(attributes map[string]nms.AttributeValue) nms.Sit
 	}
 }
 
+func attributesFromMap(snapshot map[string]any) map[string]nms.AttributeValue {
+	return map[string]nms.AttributeValue{
+		"topology.logical.ipv4.snapshot": {Key: "topology.logical.ipv4.snapshot", Value: snapshot},
+	}
+}
+
 type deviceRoleInfo struct {
 	displayType  string
 	displayRole  string
@@ -1081,6 +1225,15 @@ func topologyEdgeLabel(reason string) string {
 func (s *apiServer) deviceDetailHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		deviceID := chi.URLParam(r, "deviceId")
+		if s.useLocalStore() {
+			device, err := s.local.GetDevice(r.Context(), deviceID)
+			if err != nil {
+				writeJSON(w, http.StatusOK, deviceDetailResponse{Item: nil, Source: "postgres", Message: "PostgreSQL device detail could not be loaded"})
+				return
+			}
+			writeJSON(w, http.StatusOK, deviceDetailResponse{Item: &device, Source: "postgres", Message: "Device detail loaded from PostgreSQL"})
+			return
+		}
 
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, deviceDetailResponse{
@@ -1119,6 +1272,15 @@ func (s *apiServer) deviceDetailHandler() http.HandlerFunc {
 func (s *apiServer) latestTelemetryHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		deviceID := chi.URLParam(r, "deviceId")
+		if s.useLocalStore() {
+			items, err := s.local.LatestTelemetry(r.Context(), deviceID)
+			if err != nil {
+				writeJSON(w, http.StatusOK, latestTelemetryResponse{DeviceID: deviceID, Items: []nms.TelemetryValue{}, Source: "postgres", Message: "PostgreSQL latest telemetry could not be loaded"})
+				return
+			}
+			writeJSON(w, http.StatusOK, latestTelemetryResponse{DeviceID: deviceID, Items: items, Source: "postgres", Message: "Latest telemetry loaded from PostgreSQL"})
+			return
+		}
 
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, latestTelemetryResponse{
@@ -1161,6 +1323,16 @@ func (s *apiServer) latestTelemetryHandler() http.HandlerFunc {
 func (s *apiServer) telemetryHistoryHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		deviceID := chi.URLParam(r, "deviceId")
+		if s.useLocalStore() {
+			now := time.Now().UnixMilli()
+			series, err := s.local.TelemetryHistory(r.Context(), deviceID, splitQueryCSV(r.URL.Query().Get("keys")), parseInt64Query(r, "startTs", now-60*60*1000), parseInt64Query(r, "endTs", now), parseIntQuery(r, "limit", 500))
+			if err != nil {
+				writeJSON(w, http.StatusOK, telemetryHistoryResponse{DeviceID: deviceID, Series: []nms.TelemetrySeries{}, Source: "postgres", Message: "PostgreSQL telemetry history could not be loaded"})
+				return
+			}
+			writeJSON(w, http.StatusOK, telemetryHistoryResponse{DeviceID: deviceID, Series: series, Source: "postgres", Message: "Telemetry history loaded from PostgreSQL"})
+			return
+		}
 
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, telemetryHistoryResponse{
@@ -1233,6 +1405,26 @@ func (s *apiServer) telemetryHistoryHandler() http.HandlerFunc {
 func (s *apiServer) deviceSummaryHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		deviceID := chi.URLParam(r, "deviceId")
+		if s.useLocalStore() {
+			device, err := s.local.GetDevice(r.Context(), deviceID)
+			if err != nil {
+				writeJSON(w, http.StatusOK, deviceSummaryResponse{Item: nil, Source: "postgres", Message: "PostgreSQL device summary could not be loaded"})
+				return
+			}
+			latestTelemetry, err := s.local.LatestTelemetry(r.Context(), deviceID)
+			if err != nil {
+				writeJSON(w, http.StatusOK, deviceSummaryResponse{Item: nil, Source: "postgres", Message: "PostgreSQL device summary could not be loaded"})
+				return
+			}
+			lastTelemetryTs := int64(0)
+			for _, item := range latestTelemetry {
+				if item.Timestamp > lastTelemetryTs {
+					lastTelemetryTs = item.Timestamp
+				}
+			}
+			writeJSON(w, http.StatusOK, deviceSummaryResponse{Item: &nms.DeviceSummary{DeviceID: device.DeviceID, Name: device.Name, Type: device.Type, Label: device.Label, Profile: device.Profile, Status: "active", TelemetryCount: len(latestTelemetry), LastTelemetryTs: lastTelemetryTs, LatestTelemetry: latestTelemetry}, Source: "postgres", Message: "Device summary loaded from PostgreSQL"})
+			return
+		}
 
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, deviceSummaryResponse{
@@ -1299,6 +1491,22 @@ func (s *apiServer) deviceSummaryHandler() http.HandlerFunc {
 func (s *apiServer) deviceDashboardHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		deviceID := chi.URLParam(r, "deviceId")
+		if s.useLocalStore() {
+			device, err := s.local.GetDevice(r.Context(), deviceID)
+			if err != nil {
+				writeJSON(w, http.StatusOK, deviceDashboardResponse{DeviceDashboard: emptyDeviceDashboard(deviceID), Source: "postgres", Message: "PostgreSQL device dashboard could not be loaded"})
+				return
+			}
+			telemetry, err := s.local.LatestTelemetry(r.Context(), deviceID)
+			if err != nil {
+				writeJSON(w, http.StatusOK, deviceDashboardResponse{DeviceDashboard: emptyDeviceDashboard(deviceID), Source: "postgres", Message: "PostgreSQL device dashboard telemetry could not be loaded"})
+				return
+			}
+			attributes, _ := s.local.Attributes(r.Context(), deviceID)
+			dashboard := buildDeviceDashboard(thingsboard.Device{ID: device.DeviceID, Name: device.Name, Type: device.Type, Label: device.Label, Asset: device.Profile}, telemetry, attributes)
+			writeJSON(w, http.StatusOK, deviceDashboardResponse{DeviceDashboard: dashboard, Source: "postgres", Message: "Device dashboard loaded from PostgreSQL"})
+			return
+		}
 
 		if s.tb == nil {
 			writeJSON(w, http.StatusOK, deviceDashboardResponse{
@@ -1367,6 +1575,15 @@ func (s *apiServer) deviceDashboardHandler() http.HandlerFunc {
 func (s *apiServer) deviceAttributesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		deviceID := chi.URLParam(r, "deviceId")
+		if s.useLocalStore() {
+			attrs, err := s.local.Attributes(r.Context(), deviceID)
+			if err != nil {
+				writeJSON(w, http.StatusOK, attributesResponse{EntityType: "DEVICE", EntityID: deviceID, Scopes: map[string][]nms.AttributeValue{}, Source: "postgres", Message: "PostgreSQL attributes could not be loaded"})
+				return
+			}
+			writeJSON(w, http.StatusOK, attributesResponse{EntityType: "DEVICE", EntityID: deviceID, Scopes: map[string][]nms.AttributeValue{"SERVER_SCOPE": attrs}, Source: "postgres", Message: "Attributes loaded from PostgreSQL"})
+			return
+		}
 		scopes := requestedScopes(r, []string{"SERVER_SCOPE", "CLIENT_SCOPE", "SHARED_SCOPE"})
 		s.writeAttributes(w, r, "DEVICE", deviceID, scopes)
 	}
@@ -1541,7 +1758,14 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 		SortProperty: "createdTime",
 		SortOrder:    "DESC",
 	}
-	alarmPage, alarmErr := s.tbListAlarms(ctx, alarmQuery)
+	alarmPage := thingsboard.AlarmPage{}
+	var alarmErr error
+	localAlarms := nms.AlarmPage{}
+	if s.useLocalStore() {
+		localAlarms, alarmErr = s.local.ListAlarms(ctx, "", "", 0, 200)
+	} else {
+		alarmPage, alarmErr = s.tbListAlarms(ctx, alarmQuery)
+	}
 	activeAlarmCount := 0
 	criticalAlarmCount := 0
 	alarmsByDevice := make(map[string][]thingsboard.AlarmInfo)
@@ -1555,6 +1779,17 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 			}
 			if alarm.Originator.EntityType == "DEVICE" {
 				alarmsByDevice[alarm.Originator.ID] = append(alarmsByDevice[alarm.Originator.ID], alarm)
+			}
+		}
+		for _, alarm := range localAlarms.Items {
+			if alarm.Status == "ACTIVE_UNACK" || alarm.Status == "ACTIVE_ACK" {
+				activeAlarmCount++
+				if alarm.Severity == "CRITICAL" || alarm.Severity == "MAJOR" {
+					criticalAlarmCount++
+				}
+			}
+			if alarm.OriginatorID != "" {
+				alarmsByDevice[alarm.OriginatorID] = append(alarmsByDevice[alarm.OriginatorID], thingsboard.AlarmInfo{Severity: alarm.Severity})
 			}
 		}
 	}
@@ -1762,11 +1997,11 @@ func (s *apiServer) buildReportsSnapshot(ctx context.Context, r *http.Request) (
 
 func (s *apiServer) reportOverviewHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if s.tb == nil {
+		if !s.useLocalStore() && s.tb == nil {
 			writeJSON(w, http.StatusOK, reportOverviewResponse{
 				Sites:   []nms.ReportSiteRow{},
 				Devices: []nms.ReportDeviceRow{},
-				Source:  "thingsboard",
+				Source:  s.activeSource(),
 				Message: "ThingsBoard integration not configured",
 			})
 			return
@@ -1791,7 +2026,7 @@ func (s *apiServer) reportOverviewHandler() http.HandlerFunc {
 			Sites:              snapshot.siteRows,
 			Devices:            snapshot.allDevices,
 			GeneratedAt:        snapshot.generatedAt,
-			Source:             "thingsboard",
+			Source:             s.activeSource(),
 			Message:            "Overview report generated",
 		})
 	}
@@ -1800,6 +2035,17 @@ func (s *apiServer) reportOverviewHandler() http.HandlerFunc {
 func (s *apiServer) loadLatestTelemetryBatch(ctx context.Context, devices []nms.Device) map[string]deviceTelemetrySnapshot {
 	results := make(map[string]deviceTelemetrySnapshot, len(devices))
 	if len(devices) == 0 {
+		return results
+	}
+	if s.useLocalStore() {
+		for _, device := range devices {
+			telemetry, err := s.local.LatestTelemetry(ctx, device.DeviceID)
+			items := make([]thingsboard.TelemetryValue, 0, len(telemetry))
+			for _, item := range telemetry {
+				items = append(items, thingsboard.TelemetryValue{Key: item.Key, Value: item.Value, Timestamp: item.Timestamp})
+			}
+			results[device.DeviceID] = deviceTelemetrySnapshot{telemetry: items, err: err}
+		}
 		return results
 	}
 
@@ -1833,9 +2079,9 @@ func (s *apiServer) loadLatestTelemetryBatch(ctx context.Context, devices []nms.
 
 func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if s.tb == nil {
+		if !s.useLocalStore() && s.tb == nil {
 			writeJSON(w, http.StatusOK, reportSummaryResponse{
-				Source:  "thingsboard",
+				Source:  s.activeSource(),
 				Message: "ThingsBoard integration not configured",
 			})
 			return
@@ -1857,7 +2103,7 @@ func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 			TopSitesByAlarms:   snapshot.topSitesByAlarms,
 			TopDevicesByIssues: snapshot.topDevicesByIssues,
 			GeneratedAt:        snapshot.generatedAt,
-			Source:             "thingsboard",
+			Source:             s.activeSource(),
 			Message:            "Report summary generated",
 		})
 	}
@@ -1865,10 +2111,10 @@ func (s *apiServer) reportsSummaryHandler() http.HandlerFunc {
 
 func (s *apiServer) reportsSitesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if s.tb == nil {
+		if !s.useLocalStore() && s.tb == nil {
 			writeJSON(w, http.StatusOK, reportSitesListResponse{
 				Items:   []nms.ReportSiteRow{},
-				Source:  "thingsboard",
+				Source:  s.activeSource(),
 				Message: "ThingsBoard integration not configured",
 			})
 			return
@@ -1888,7 +2134,7 @@ func (s *apiServer) reportsSitesHandler() http.HandlerFunc {
 		writeJSON(w, http.StatusOK, reportSitesListResponse{
 			Range:   snapshot.reportRange,
 			Items:   snapshot.topSitesByAlarms,
-			Source:  "thingsboard",
+			Source:  s.activeSource(),
 			Message: "Site report generated",
 		})
 	}
@@ -1896,10 +2142,10 @@ func (s *apiServer) reportsSitesHandler() http.HandlerFunc {
 
 func (s *apiServer) reportsDevicesHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if s.tb == nil {
+		if !s.useLocalStore() && s.tb == nil {
 			writeJSON(w, http.StatusOK, reportDevicesListResponse{
 				Items:   []nms.ReportDeviceRow{},
-				Source:  "thingsboard",
+				Source:  s.activeSource(),
 				Message: "ThingsBoard integration not configured",
 			})
 			return
@@ -1928,7 +2174,7 @@ func (s *apiServer) reportsDevicesHandler() http.HandlerFunc {
 		writeJSON(w, http.StatusOK, reportDevicesListResponse{
 			Range:   snapshot.reportRange,
 			Items:   items,
-			Source:  "thingsboard",
+			Source:  s.activeSource(),
 			Message: "Device report generated",
 		})
 	}
@@ -1963,6 +2209,10 @@ func parseFloat64(value string) float64 {
 }
 
 func (s *apiServer) loadSites(ctx context.Context) ([]nms.Site, error) {
+	if s.useLocalStore() {
+		return s.local.ListSites(ctx)
+	}
+
 	var (
 		assets []thingsboard.Asset
 		err    error
@@ -2035,6 +2285,10 @@ func slugify(value string) string {
 }
 
 func (s *apiServer) loadSiteDevices(ctx context.Context, site nms.Site) ([]nms.Device, error) {
+	if s.useLocalStore() {
+		return s.local.ListSiteDevices(ctx, site.SiteKey)
+	}
+
 	relations, err := s.tbGetAssetRelations(ctx, site.AssetID)
 	if err != nil {
 		return nil, err

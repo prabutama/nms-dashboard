@@ -7,14 +7,17 @@ import (
 )
 
 type Config struct {
-	Port                string
 	ThingsBoardBaseURL  string
 	ThingsBoardAPIKey   string
 	ThingsBoardSiteType string
+	HasThingsBoardSetup bool
+	Port                string
 	CORSAllowedOrigins  []string
 	CacheTTLSeconds     int
-	HasThingsBoardSetup bool
 	PublicDemoMode      bool
+	DataSource          string
+	DatabaseURL         string
+	IngestAPIKey        string
 }
 
 func Load() Config {
@@ -25,18 +28,18 @@ func Load() Config {
 		}
 	}
 
-	thingsBoardBaseURL := os.Getenv("THINGSBOARD_BASE_URL")
-	thingsBoardAPIKey := os.Getenv("THINGSBOARD_API_KEY")
-
 	return Config{
-		Port:                getEnv("PORT", "8080"),
-		ThingsBoardBaseURL:  thingsBoardBaseURL,
-		ThingsBoardAPIKey:   thingsBoardAPIKey,
+		ThingsBoardBaseURL:  os.Getenv("THINGSBOARD_BASE_URL"),
+		ThingsBoardAPIKey:   os.Getenv("THINGSBOARD_API_KEY"),
 		ThingsBoardSiteType: getEnv("THINGSBOARD_SITE_ASSET_TYPE", "site"),
+		HasThingsBoardSetup: os.Getenv("THINGSBOARD_BASE_URL") != "" && os.Getenv("THINGSBOARD_API_KEY") != "",
+		Port:                getEnv("PORT", "8080"),
 		CORSAllowedOrigins:  splitCSVEnv(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:3000")),
 		CacheTTLSeconds:     cacheTTLSeconds,
-		HasThingsBoardSetup: thingsBoardBaseURL != "" && thingsBoardAPIKey != "",
 		PublicDemoMode:      strings.EqualFold(getEnv("PUBLIC_DEMO_MODE", "false"), "true"),
+		DataSource:          strings.ToLower(getEnv("NMS_DATA_SOURCE", "postgres")),
+		DatabaseURL:         os.Getenv("DATABASE_URL"),
+		IngestAPIKey:        os.Getenv("NMS_INGEST_API_KEY"),
 	}
 }
 

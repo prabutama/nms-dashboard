@@ -57,7 +57,12 @@ render_manifests() {
   image_tag="$1"
   render_directory="$(mktemp -d)"
 
-  for manifest in 01-secret.yaml 02-deployment.yaml 03-service.yaml 04-ingress.yaml; do
+  for manifest in 01-secret.yaml 02-deployment.yaml 03-service.yaml 04-ingress.yaml 05-postgres.yaml; do
+    if [ ! -f "$manifest" ]; then
+      echo "Required manifest not found: $manifest" >&2
+      rm -rf "$render_directory"
+      exit 1
+    fi
     sed \
       -e "s|__DOCKERHUB_NAMESPACE__|$DOCKERHUB_NAMESPACE|g" \
       -e "s|__IMAGE_TAG__|$image_tag|g" \
@@ -68,12 +73,17 @@ render_manifests() {
 }
 
 sync_secrets() {
-  : "${THINGSBOARD_API_KEY:?THINGSBOARD_API_KEY is required from Infisical runtime secrets}"
+  : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required from Infisical runtime secrets}"
+  : "${NMS_INGEST_API_KEY:?NMS_INGEST_API_KEY is required from Infisical runtime secrets}"
   : "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required from Infisical runtime secrets}"
   : "${DOCKERHUB_READ_TOKEN:?DOCKERHUB_READ_TOKEN is required from Infisical runtime secrets}"
 
+  database_url="postgres://nms:${POSTGRES_PASSWORD}@nms-postgres.nms.svc.cluster.local:5432/nms_dashboard?sslmode=disable"
+
   kubectl -n "$NAMESPACE" create secret generic nms-bff-secrets \
-    --from-literal="THINGSBOARD_API_KEY=$THINGSBOARD_API_KEY" \
+    --from-literal="POSTGRES_PASSWORD=$POSTGRES_PASSWORD" \
+    --from-literal="DATABASE_URL=$database_url" \
+    --from-literal="NMS_INGEST_API_KEY=$NMS_INGEST_API_KEY" \
     --dry-run=client \
     -o yaml |
     kubectl apply -f -
@@ -91,10 +101,13 @@ deploy_image() {
   image_tag="$1"
   render_directory="$(render_manifests "$image_tag")"
 
+  test -f "$render_directory/05-postgres.yaml"
+
   kubectl apply -f "$render_directory/01-secret.yaml"
   sync_secrets
 
   kubectl apply \
+    -f "$render_directory/05-postgres.yaml" \
     -f "$render_directory/02-deployment.yaml" \
     -f "$render_directory/03-service.yaml" \
     -f "$render_directory/04-ingress.yaml"
@@ -118,7 +131,8 @@ deploy_with_infisical() {
 
 if [ "$RUNTIME_MODE" = "--runtime" ]; then
   : "${DOCKERHUB_NAMESPACE:?DOCKERHUB_NAMESPACE is required}"
-  : "${THINGSBOARD_API_KEY:?THINGSBOARD_API_KEY is required}"
+  : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+  : "${NMS_INGEST_API_KEY:?NMS_INGEST_API_KEY is required}"
   : "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required}"
   : "${DOCKERHUB_READ_TOKEN:?DOCKERHUB_READ_TOKEN is required}"
   deploy_image "$NEW_IMAGE_TAG"

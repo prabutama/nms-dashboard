@@ -26,7 +26,6 @@ type memoryCache struct {
 	mu             sync.RWMutex
 	authUsers      map[string]authCacheEntry
 	responses      map[string]responseCacheEntry
-	authTTL        time.Duration
 	defaultRespTTL time.Duration
 }
 
@@ -38,23 +37,16 @@ func newMemoryCache(cfgTTLSeconds int) *memoryCache {
 	return &memoryCache{
 		authUsers:      make(map[string]authCacheEntry),
 		responses:      make(map[string]responseCacheEntry),
-		authTTL:        15 * time.Second,
 		defaultRespTTL: respTTL,
 	}
 }
 
 func (c *memoryCache) getAuthUser(token string) (thingsboard.UserInfo, bool) {
-	cacheKey := hashCacheKey(token)
-	now := time.Now()
+	key := hashCacheKey(token)
 	c.mu.RLock()
-	entry, ok := c.authUsers[cacheKey]
+	entry, ok := c.authUsers[key]
 	c.mu.RUnlock()
-	if !ok || now.After(entry.expiresAt) {
-		if ok {
-			c.mu.Lock()
-			delete(c.authUsers, cacheKey)
-			c.mu.Unlock()
-		}
+	if !ok || time.Now().After(entry.expiresAt) {
 		return thingsboard.UserInfo{}, false
 	}
 	return entry.user, true
@@ -62,7 +54,7 @@ func (c *memoryCache) getAuthUser(token string) (thingsboard.UserInfo, bool) {
 
 func (c *memoryCache) setAuthUser(token string, user thingsboard.UserInfo) {
 	c.mu.Lock()
-	c.authUsers[hashCacheKey(token)] = authCacheEntry{user: user, expiresAt: time.Now().Add(c.authTTL)}
+	c.authUsers[hashCacheKey(token)] = authCacheEntry{user: user, expiresAt: time.Now().Add(15 * time.Second)}
 	c.mu.Unlock()
 }
 

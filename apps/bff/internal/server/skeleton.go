@@ -39,12 +39,11 @@ func simpleHealthHandler(cfg config.Config) http.HandlerFunc {
 			Version:   "skeleton",
 			Phase:     "phase-1",
 			Config: map[string]interface{}{
-				"port":                     cfg.Port,
-				"cacheTtlSeconds":          cfg.CacheTTLSeconds,
-				"thingsBoardBaseUrlSet":    cfg.ThingsBoardBaseURL != "",
-				"thingsBoardApiKeySet":     cfg.ThingsBoardAPIKey != "",
-				"thingsBoardSiteAssetType": cfg.ThingsBoardSiteType,
-				"corsAllowedOrigins":       cfg.CORSAllowedOrigins,
+				"port":               cfg.Port,
+				"cacheTtlSeconds":    cfg.CacheTTLSeconds,
+				"dataSource":         cfg.DataSource,
+				"postgresConfigured": cfg.DatabaseURL != "",
+				"corsAllowedOrigins": cfg.CORSAllowedOrigins,
 			},
 		}
 
