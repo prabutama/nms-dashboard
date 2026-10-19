@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nms-agent
+  namespace: nms
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: nms-agent
+  template:
+    metadata:
+      labels:
+        app: nms-agent
+    spec:
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      nodeSelector:
+        kubernetes.io/hostname: server-isa
+      containers:
+        - name: agent
+          image: python:3.11-slim
+          imagePullPolicy: IfNotPresent
+          workingDir: /opt/nms-agent
+          command:
+            - sh
+            - -c
+            - >-
+              pip install --no-cache-dir -r requirements.txt &&
+              python main.py
+          env:
+            - name: NMS_DATA_SOURCE
+              value: nms_dashboard
+            - name: NMS_BFF_URL
+              value: http://nms-bff.nms.svc.cluster.local:8080
+            - name: NMS_INGEST_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: nms-bff-secrets
+                  key: NMS_INGEST_API_KEY
+            - name: NMS_SITE_KEY
+              value: nms-network
+            - name: NMS_SITE_NAME
+              value: Lab CSRG
+            - name: NMS_SITE_REGION
+              value: 10.10.10.0/24
+            - name: DISCOVERY_CIDR
+              value: 10.10.10.0/24
+            - name: DISCOVERY_WORKERS
+              value: "32"
+            - name: SNMP_COMMUNITY
+              value: public
+            - name: SSH_LINUX_ENABLED
+              value: "true"
+            - name: NMS_SSH_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: nms-agent-secrets
+                  key: NMS_SSH_USERNAME
+            - name: NMS_SSH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nms-agent-secrets
+                  key: NMS_SSH_PASSWORD
+            - name: NMS_SSH_ALLOW_UNKNOWN_HOSTS
+              value: "true"
+            - name: POLL_INTERVAL_SECONDS
+              value: "60"
+            - name: POLL_WORKERS
+              value: "16"
+            - name: DEVICE_COLLECT_TIMEOUT_SEC
+              value: "45"
+          volumeMounts:
+            - name: source
+              mountPath: /opt/nms-agent
+      volumes:
+        - name: source
+          configMap:
+            name: nms-agent-source

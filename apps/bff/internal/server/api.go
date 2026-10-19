@@ -2573,6 +2573,10 @@ func enrichAttributeMapFromTelemetry(attributes map[string]nms.AttributeValue, t
 }
 
 func isTelemetryMetadataKey(key string) bool {
+	switch key {
+	case "ip_address", "location", "device_type", "contact", "routing_table":
+		return true
+	}
 	if matches := interfaceMetricKeyRE.FindStringSubmatch(key); len(matches) == 3 {
 		switch matches[2] {
 		case "name", "alias", "description":
