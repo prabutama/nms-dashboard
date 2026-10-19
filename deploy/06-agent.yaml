@@ -28,6 +28,7 @@ spec:
             - sh
             - -c
             - >-
+              apt-get update && apt-get install -y --no-install-recommends iputils-ping &&
               pip install --no-cache-dir -r requirements.txt &&
               python main.py
           env:
