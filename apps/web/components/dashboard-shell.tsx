@@ -122,7 +122,7 @@ export function DashboardShell({ title, subtitle, actions, children }: { title: 
           </div>
           {subtitle ? <p className="mt-0.5 max-w-3xl text-sm text-slate-600">{subtitle}</p> : null}
         </div>
-        <div className="flex flex-1 flex-col space-y-4 px-4 py-5 sm:px-6">
+        <div className="flex min-h-0 flex-1 flex-col space-y-4 px-4 py-5 sm:px-6">
           {children}
         </div>
       </div>

@@ -112,7 +112,7 @@ export function OverviewDashboard() {
         </Panel>
       </div>
 
-      <div className="grid flex-1 items-stretch gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,2.2fr)_minmax(280px,0.8fr)]">
+      <div className="grid items-stretch gap-3 xl:min-h-[calc(100vh-430px)] xl:grid-cols-[minmax(0,2.2fr)_minmax(280px,0.8fr)]">
         <SiteMapPanel items={siteMapItems} totalSites={sitesQuery.data?.items.length || 0} missingCoordinateCount={missingCoordinateCount} compact />
         <Panel title="Reachability" className="h-full">
           <div className="space-y-3 p-3">

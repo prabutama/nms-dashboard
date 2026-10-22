@@ -35,7 +35,7 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount, compac
   };
 
   return (
-    <div className="flex h-full min-h-[320px] flex-col rounded-md border border-slate-300 bg-white shadow-sm">
+    <div className="flex h-full min-h-[320px] min-w-0 flex-col rounded-md border border-slate-300 bg-white shadow-sm">
       <div className={`flex items-center justify-between rounded-t-md border-b border-slate-300 bg-slate-100 ${compact ? "px-3 py-2" : "px-4 py-3"}`}>
         <div>
           <p className="text-xs font-semibold text-slate-800">Site Map</p>
@@ -58,7 +58,7 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount, compac
           </div> : null}
           <div className={`flex min-h-0 flex-1 ${compact ? "" : "gap-4"} `}>
             <div className="flex min-h-0 flex-1 overflow-hidden rounded-sm border border-slate-300 bg-slate-100">
-              <MapContainer ref={mapRef} bounds={indonesiaBounds} scrollWheelZoom className={`${compact ? "h-full min-h-[320px]" : "h-[360px]"} w-full`} attributionControl={false}>
+              <MapContainer ref={mapRef} bounds={indonesiaBounds} scrollWheelZoom className={`${compact ? "!h-full !min-h-[320px]" : "h-[360px]"} w-full`} attributionControl={false}>
                 <FitMapToSites items={items} />
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
