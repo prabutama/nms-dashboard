@@ -94,7 +94,7 @@ export function DashboardShell({ title, subtitle, actions, children }: { title: 
         </div>
       </aside>
 
-      <div className={contentOffsetClass}>
+      <div className={`flex min-h-screen flex-col ${contentOffsetClass}`}>
         <div className="border-b border-slate-300 bg-white px-4 py-3 shadow-sm sm:px-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
@@ -122,7 +122,7 @@ export function DashboardShell({ title, subtitle, actions, children }: { title: 
           </div>
           {subtitle ? <p className="mt-0.5 max-w-3xl text-sm text-slate-600">{subtitle}</p> : null}
         </div>
-        <div className="space-y-4 px-4 py-5 sm:px-6">
+        <div className="flex flex-1 flex-col space-y-4 px-4 py-5 sm:px-6">
           {children}
         </div>
       </div>

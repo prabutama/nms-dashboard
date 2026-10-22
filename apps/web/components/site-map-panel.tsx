@@ -56,9 +56,9 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount, compac
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-600" />Critical</span>
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-500" />Unknown</span>
           </div> : null}
-          <div className={`flex flex-1 ${compact ? "" : "gap-4"} `}>
+          <div className={`flex min-h-0 flex-1 ${compact ? "" : "gap-4"} `}>
             <div className="flex min-h-0 flex-1 overflow-hidden rounded-sm border border-slate-300 bg-slate-100">
-              <MapContainer ref={mapRef} bounds={indonesiaBounds} scrollWheelZoom className={`${compact ? "h-[clamp(300px,42vh,520px)]" : "h-[360px]"} w-full`} attributionControl={false}>
+              <MapContainer ref={mapRef} bounds={indonesiaBounds} scrollWheelZoom className={`${compact ? "h-full min-h-[320px]" : "h-[360px]"} w-full`} attributionControl={false}>
                 <FitMapToSites items={items} />
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
