@@ -35,8 +35,8 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount, compac
   };
 
   return (
-    <div className="h-full border border-slate-300 bg-white shadow-sm">
-      <div className={`flex items-center justify-between border-b border-slate-300 bg-slate-100 ${compact ? "px-3 py-2" : "px-4 py-3"}`}>
+    <div className="flex h-full min-h-[320px] flex-col rounded-md border border-slate-300 bg-white shadow-sm">
+      <div className={`flex items-center justify-between rounded-t-md border-b border-slate-300 bg-slate-100 ${compact ? "px-3 py-2" : "px-4 py-3"}`}>
         <div>
           <p className="text-xs font-semibold text-slate-800">Site Map</p>
           {!compact ? <p className="mt-0.5 text-[11px] text-slate-600">Branch locations from site latitude and longitude attributes.</p> : null}
@@ -49,16 +49,16 @@ export function SiteMapPanel({ items, totalSites, missingCoordinateCount, compac
       {items.length === 0 ? (
         <div className="px-4 py-10 text-center text-xs text-slate-600">No site coordinates available.</div>
       ) : (
-        <div className={compact ? "p-2" : "p-4"}>
+        <div className={`flex flex-1 flex-col ${compact ? "p-2" : "p-4"}`}>
           {!compact ? <div className="mb-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-700">
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" />Normal</span>
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-amber-500" />Warning</span>
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-red-600" />Critical</span>
             <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full bg-slate-500" />Unknown</span>
           </div> : null}
-          <div className={compact ? "grid" : "grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]"}>
-            <div className="overflow-hidden border border-slate-300 bg-slate-100">
-              <MapContainer ref={mapRef} bounds={indonesiaBounds} scrollWheelZoom className={`${compact ? "h-[205px]" : "h-[360px]"} w-full`} attributionControl={false}>
+          <div className={`flex flex-1 ${compact ? "" : "gap-4"} `}>
+            <div className="flex min-h-0 flex-1 overflow-hidden rounded-sm border border-slate-300 bg-slate-100">
+              <MapContainer ref={mapRef} bounds={indonesiaBounds} scrollWheelZoom className={`${compact ? "h-[clamp(300px,42vh,520px)]" : "h-[360px]"} w-full`} attributionControl={false}>
                 <FitMapToSites items={items} />
                 <TileLayer
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
