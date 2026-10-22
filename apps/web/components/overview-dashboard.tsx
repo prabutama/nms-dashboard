@@ -54,6 +54,16 @@ export function OverviewDashboard() {
   };
   const freshestDeviceUpdate = latestTimestamp((overviewQuery.data?.devices || []).map((device) => device.updatedAt));
   const currentDeviceCount = (overviewQuery.data?.devices || []).filter((device) => freshnessState(device.updatedAt) === "current").length;
+  const devices = overviewQuery.data?.devices || [];
+  const offlineDeviceCount = devices.filter((device) => !device.reachable).length;
+  const deviceTypes = Object.entries(devices.reduce<Record<string, number>>((counts, device) => {
+    const type = device.type || "unknown";
+    counts[type] = (counts[type] || 0) + 1;
+    return counts;
+  }, {})).sort((a, b) => b[1] - a[1]);
+  const deviceRows = [...devices]
+    .sort((a, b) => healthRank(a.health) - healthRank(b.health) || new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 10);
 
   return (
     <DashboardShell
@@ -85,8 +95,8 @@ export function OverviewDashboard() {
 
       <div className="grid items-stretch gap-3 xl:min-h-[calc(100vh-430px)] xl:grid-cols-[minmax(0,2.2fr)_minmax(280px,0.8fr)]">
         <SiteMapPanel items={siteMapItems} totalSites={sitesQuery.data?.items.length || 0} missingCoordinateCount={missingCoordinateCount} compact />
-        <Panel title="Reachability" className="h-full">
-          <div className="space-y-3 p-3">
+        <Panel title="Network Inspector" className="h-full">
+          <div className="space-y-4 p-3">
             <div>
               <div className="mb-1 flex items-center justify-between text-xs text-slate-700">
                 <span>Online devices</span>
@@ -96,12 +106,50 @@ export function OverviewDashboard() {
                 <div className="h-full bg-blue-700" style={{ width: `${Math.min(100, Math.max(0, onlinePct))}%` }} />
               </div>
             </div>
-            <SignalLine label="Stale telemetry" value={summary?.staleDeviceCount ?? 0} status={(summary?.staleDeviceCount ?? 0) > 0 ? "warning" : "normal"} />
-            <SignalLine label="Data source" value={overviewQuery.data?.source || "postgres"} status="normal" />
-            <SignalLine label="Mapped sites" value={`${siteMapItems.length}/${sitesQuery.data?.items.length || 0}`} status={missingCoordinateCount > 0 ? "warning" : "normal"} />
+            <dl className="divide-y divide-slate-200 border-y border-slate-200 text-xs">
+              <InspectorRow label="Current telemetry" value={`${currentDeviceCount}/${totalDeviceCount}`} tone={currentDeviceCount < totalDeviceCount ? "warning" : "normal"} />
+              <InspectorRow label="Stale telemetry" value={summary?.staleDeviceCount ?? 0} tone={(summary?.staleDeviceCount ?? 0) > 0 ? "warning" : "normal"} />
+              <InspectorRow label="Unreachable" value={offlineDeviceCount} tone={offlineDeviceCount > 0 ? "critical" : "normal"} />
+              <InspectorRow label="Data source" value={overviewQuery.data?.source || "postgres"} />
+              <InspectorRow label="Mapped location" value={`${siteMapItems.length}/${sitesQuery.data?.items.length || 0}`} tone={missingCoordinateCount > 0 ? "warning" : "normal"} />
+            </dl>
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.05em] text-slate-500">Inventory</p>
+              <div className="space-y-1.5">
+                {deviceTypes.map(([type, count]) => (
+                  <div key={type} className="flex items-center justify-between text-xs">
+                    <span className="capitalize text-slate-600">{type.replaceAll("_", " ")}</span>
+                    <span className="font-mono font-semibold text-slate-900">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </Panel>
       </div>
+
+      <Panel title="Device Health" action={<Link href="/devices" className="text-[11px] font-medium text-blue-700 hover:underline">All devices</Link>}>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[820px] border-collapse text-left text-xs">
+            <thead className="border-b border-slate-300 bg-slate-50 text-[10px] uppercase tracking-[0.04em] text-slate-500">
+              <tr>
+                <th className="px-3 py-2 font-semibold">Device</th>
+                <th className="px-3 py-2 font-semibold">Type</th>
+                <th className="px-3 py-2 font-semibold">State</th>
+                <th className="px-3 py-2 font-semibold">Telemetry</th>
+                <th className="px-3 py-2 text-right font-semibold">Latency</th>
+                <th className="px-3 py-2 text-right font-semibold">Loss</th>
+                <th className="px-3 py-2 text-right font-semibold">CPU</th>
+                <th className="px-3 py-2 text-right font-semibold">Memory</th>
+                <th className="px-3 py-2 text-right font-semibold">Updated</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {deviceRows.map((device) => <DeviceHealthRow key={device.deviceId} device={device} />)}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
       <Panel title="Operational Events" action={<Link href="/alarms" className="text-[11px] font-medium text-blue-700 hover:underline">Open alarms</Link>}>
         {alarms.length === 0 && issueDevices.length === 0 ? <p className="px-3 py-3 text-xs text-slate-500">No active incidents.</p> : (
@@ -161,24 +209,42 @@ function AlarmRow({ alarm }: { alarm: Alarm }) {
   );
 }
 
-function SignalLine({ label, value, status }: { label: string; value: string | number; status: string }) {
+function InspectorRow({ label, value, tone = "neutral" }: { label: string; value: string | number; tone?: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 border border-slate-200 bg-slate-50 px-2.5 py-2">
-      <span className="text-xs text-slate-700">{label}</span>
-      <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold text-slate-950">{value}</span>
-        <StatusBadge status={status} />
-      </div>
+    <div className="flex items-center justify-between gap-3 py-2">
+      <dt className="text-slate-600">{label}</dt>
+      <dd className={`font-mono font-semibold ${tone === "critical" ? "text-red-700" : tone === "warning" ? "text-amber-700" : "text-slate-950"}`}>{value}</dd>
     </div>
   );
 }
 
-function IssueMetric({ label, value, tone }: { label: string; value: string | number; tone: string }) {
-  return <span className={`border px-1 py-0.5 ${tone === "critical" ? "border-red-200 bg-red-50 text-red-800" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>{label} {value}</span>;
+function DeviceHealthRow({ device }: { device: ReportDeviceRow }) {
+  const state = !device.reachable ? "Offline" : device.health === "critical" ? "Critical" : device.health === "warning" ? "Warning" : "Online";
+  const stateClass = state === "Offline" || state === "Critical" ? "text-red-700" : state === "Warning" ? "text-amber-700" : "text-emerald-700";
+  return (
+    <tr className="transition hover:bg-slate-50">
+      <td className="px-3 py-2.5"><Link href={`/devices/${device.deviceId}?site=${device.siteKey}`} className="font-medium text-slate-950 hover:text-blue-700">{device.name}</Link><p className="font-mono text-[10px] text-slate-500">{device.deviceId}</p></td>
+      <td className="px-3 py-2.5 capitalize text-slate-600">{device.type.replaceAll("_", " ")}</td>
+      <td className={`px-3 py-2.5 font-medium ${stateClass}`}>{state}</td>
+      <td className="px-3 py-2.5 text-slate-600">{device.freshness === "fresh" ? "Current" : device.freshness === "stale" ? "Stale" : "Unknown"}</td>
+      <td className="px-3 py-2.5 text-right font-mono text-slate-700">{device.avgLatencyMs.toFixed(1)} ms</td>
+      <td className="px-3 py-2.5 text-right font-mono text-slate-700">{formatPercent(device.packetLossPct)}</td>
+      <td className="px-3 py-2.5 text-right font-mono text-slate-700">{formatPercent(device.cpuAvgPct)}</td>
+      <td className="px-3 py-2.5 text-right font-mono text-slate-700">{formatPercent(device.memoryAvgPct)}</td>
+      <td className="px-3 py-2.5 text-right text-[11px] text-slate-500">{formatRelativeTime(device.updatedAt)}</td>
+    </tr>
+  );
 }
 
-function EmptyLine({ text }: { text: string }) {
-  return <p className="px-3 py-6 text-center text-xs text-slate-600">{text}</p>;
+function healthRank(health: string) {
+  if (health === "critical") return 0;
+  if (health === "warning") return 1;
+  if (health === "normal") return 2;
+  return 3;
+}
+
+function IssueMetric({ label, value, tone }: { label: string; value: string | number; tone: string }) {
+  return <span className={`border px-1 py-0.5 ${tone === "critical" ? "border-red-200 bg-red-50 text-red-800" : tone === "warning" ? "border-amber-200 bg-amber-50 text-amber-800" : "border-slate-200 bg-slate-50 text-slate-700"}`}>{label} {value}</span>;
 }
 
 function metricTone(value: number, critical: number, warning: number) {
