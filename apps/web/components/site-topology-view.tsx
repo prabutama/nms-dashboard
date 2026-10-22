@@ -14,8 +14,10 @@ type Size = { w: number; h: number };
 const NODE_W = 140;
 const ROUTER_W = 160;
 const SUBNET_W = 170;
-const SERVER_W = 130;
-const NODE_H = 28;
+const SERVER_W = 150;
+const NODE_H = 40;
+const ENDPOINT_COLUMNS = 5;
+const ENDPOINT_ROW_GAP = 58;
 
 function trimNodeName(name: string, max = 24) {
   if (name.length <= max) return name;
@@ -105,8 +107,7 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [offsetStart, setOffsetStart] = useState({ x: 0, y: 0 });
 
-  // Hide gateway devices only. Keep all other device types visible.
-  const filteredNodes = nodes.filter((n) => n.kind !== "device" || !n.type || n.type !== "gateway");
+  const filteredNodes = nodes;
   const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
   const filteredEdges = edges.filter((e) => filteredNodeIds.has(e.from) && filteredNodeIds.has(e.to));
 
@@ -123,9 +124,9 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
 
   const layerDefs = [
     { key: "external", label: "EXTERNAL", y: 30 },
-    { key: "router", label: "ROUTER", y: 110 },
-    { key: "subnet", label: "SUBNET", y: 190 },
-    { key: "server", label: "SERVER", y: 270 },
+    { key: "router", label: "GATEWAY", y: 120 },
+    { key: "subnet", label: "NETWORK", y: 210 },
+    { key: "server", label: "ENDPOINTS", y: 300 },
   ];
 
   const externals = classified.filter((n) => n.meta.layer === "external");
@@ -133,17 +134,19 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
   const subnets = classified.filter((n) => n.meta.layer === "subnet");
   const servers = classified.filter((n) => n.meta.layer === "server");
 
+  const endpointColumnCount = Math.min(ENDPOINT_COLUMNS, Math.max(1, servers.length));
+  const endpointRowCount = Math.max(1, Math.ceil(servers.length / ENDPOINT_COLUMNS));
   const contentW = Math.max(
-    600,
+    820,
     externals.length * 170,
     routers.length * 200,
     subnets.length * 190,
-    servers.length * 150,
+    endpointColumnCount * 175,
   );
   const centerX = LAYER.CONTENT_X + contentW / 2;
 
   const SVG_W = LAYER.CONTENT_X + contentW + LAYER.PAD;
-  const SVG_H = 340;
+  const SVG_H = layerDefs[3].y + endpointRowCount * ENDPOINT_ROW_GAP + 52;
 
   const pos = new Map<string, Point>();
 
@@ -194,15 +197,16 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
     });
   }
 
-  // --- Server layer ---
-  // Group servers under their connected subnet
+  // --- Endpoint layer ---
+  // Group endpoints under their connected subnet, then wrap each group into
+  // a compact grid so large inventories stay readable instead of stretching.
   const serverParent = new Map<string, string>();
   for (const sv of servers) {
     const outgoing = edgesByFrom.get(sv.id) || [];
     const incoming = edgesByTo.get(sv.id) || [];
-    const subnetEdge = outgoing.find((e) => e.reason === "connected_subnet" && e.to.startsWith("subnet:"))
-      || incoming.find((e) => e.reason === "connected_subnet" && e.from.startsWith("subnet:"));
-    const parentId = subnetEdge?.to?.startsWith("subnet:") ? subnetEdge.to : subnetEdge?.from || "";
+    const subnetEdge = outgoing.find((e) => e.reason === "connected_subnet" && nodeLayer.get(e.to) === "subnet")
+      || incoming.find((e) => e.reason === "connected_subnet" && nodeLayer.get(e.from) === "subnet");
+    const parentId = subnetEdge && nodeLayer.get(subnetEdge.to) === "subnet" ? subnetEdge.to : subnetEdge?.from || "";
     serverParent.set(sv.id, parentId);
   }
   const serverBySubnet = new Map<string, typeof servers>();
@@ -218,11 +222,17 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
     if (p) subnetCenterX.set(sn.id, p.x + SUBNET_W / 2);
   }
   for (const [parentId, items] of serverBySubnet) {
-    const sCenter = subnetCenterX.get(parentId) || (subnets.length > 0 ? centerX : centerX);
-    const xs = distribute(items.length, 150);
-    const shift = xs.map((x) => x - centerX + sCenter);
+    const sCenter = subnetCenterX.get(parentId) || centerX;
     items.forEach((n, i) => {
-      pos.set(n.id, { x: shift[i] - SERVER_W / 2, y: layerDefs[3].y });
+      const row = Math.floor(i / ENDPOINT_COLUMNS);
+      const column = i % ENDPOINT_COLUMNS;
+      const itemsInRow = Math.min(ENDPOINT_COLUMNS, items.length - row * ENDPOINT_COLUMNS);
+      const rowWidth = (itemsInRow - 1) * 175;
+      const rowStart = sCenter - rowWidth / 2;
+      pos.set(n.id, {
+        x: rowStart + column * 175 - SERVER_W / 2,
+        y: layerDefs[3].y + row * ENDPOINT_ROW_GAP,
+      });
     });
   }
 
@@ -371,7 +381,7 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
 
       <div
         ref={containerRef}
-        className="relative h-[360px] w-full overflow-hidden bg-white"
+        className="relative h-[min(70vh,720px)] min-h-[520px] w-full overflow-hidden bg-white"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -449,20 +459,22 @@ function TopologyCanvas({ nodes, edges }: { nodes: SiteTopologyNode[]; edges: Si
             );
           })}
 
-          {/* Server nodes */}
+          {/* Endpoint nodes */}
           {servers.map((n) => {
             const p = pos.get(n.id);
             if (!p) return null;
             return (
-              <g key={n.id}>
-                <rect x={p.x} y={p.y} width={SERVER_W} height={NODE_H} rx={0} fill="#f8fafc" stroke="#e2e8f0" strokeWidth={1} />
+              <a key={n.id} href={n.deviceId ? `/devices/${encodeURIComponent(n.deviceId)}` : undefined}>
+                <g className={n.deviceId ? "cursor-pointer" : ""}>
+                <rect x={p.x} y={p.y} width={SERVER_W} height={NODE_H} rx={3} fill="#f8fafc" stroke="#cbd5e1" strokeWidth={1} />
                 {/* Server icon */}
-                <rect x={p.x + 8} y={p.y + 7} width={12} height={14} rx={1} fill="none" stroke="#94a3b8" strokeWidth={1} />
-                <line x1={p.x + 10} y1={p.y + 10} x2={p.x + 18} y2={p.y + 10} stroke="#94a3b8" strokeWidth={0.8} />
-                <line x1={p.x + 10} y1={p.y + 14} x2={p.x + 18} y2={p.y + 14} stroke="#94a3b8" strokeWidth={0.8} />
-                <line x1={p.x + 10} y1={p.y + 18} x2={p.x + 18} y2={p.y + 18} stroke="#94a3b8" strokeWidth={0.8} />
-                <text x={p.x + 26} y={p.y + NODE_H / 2 + 1} textAnchor="start" fill="#1e293b" fontSize={9} fontWeight={500}>{trimNodeName(n.name)}</text>
-              </g>
+                <rect x={p.x + 9} y={p.y + 9} width={13} height={18} rx={1} fill="none" stroke="#64748b" strokeWidth={1} />
+                <line x1={p.x + 11} y1={p.y + 13} x2={p.x + 20} y2={p.y + 13} stroke="#64748b" strokeWidth={0.8} />
+                <line x1={p.x + 11} y1={p.y + 18} x2={p.x + 20} y2={p.y + 18} stroke="#64748b" strokeWidth={0.8} />
+                <text x={p.x + 29} y={p.y + 16} textAnchor="start" fill="#1e293b" fontSize={9} fontWeight={600}>{trimNodeName(n.name, 20)}</text>
+                <text x={p.x + 29} y={p.y + 29} textAnchor="start" fill="#64748b" fontSize={8} fontFamily="monospace">{trimNodeName(n.deviceId || n.type || "device", 22)}</text>
+                </g>
+              </a>
             );
           })}
         </svg>
