@@ -47,6 +47,10 @@ spec:
               value: Lab CSRG
             - name: NMS_SITE_REGION
               value: 10.10.10.0/24
+            - name: NMS_SITE_LATITUDE
+              value: "-7.2756"
+            - name: NMS_SITE_LONGITUDE
+              value: "112.7936"
             - name: DISCOVERY_CIDR
               value: 10.10.10.0/24
             - name: DISCOVERY_WORKERS
