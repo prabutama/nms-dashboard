@@ -9,7 +9,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { FreshnessStrip, StatusBadge } from "@/components/nms-ui";
 import { fetchAlarms, fetchReportOverview, fetchSites } from "@/lib/api";
 import { formatDateTime, formatPercent, formatRelativeTime, freshnessState } from "@/lib/format";
-import type { Alarm, ReportDeviceRow, ReportSiteRow } from "@/lib/types";
+import type { Alarm, ReportDeviceRow } from "@/lib/types";
 
 const SiteMapPanel = dynamic(() => import("@/components/site-map-panel").then((mod) => mod.SiteMapPanel), {
   ssr: false,
@@ -28,12 +28,7 @@ export function OverviewDashboard() {
   const totalDeviceCount = summary?.deviceCount ?? 0;
   const onlineDeviceCount = summary?.onlineDeviceCount ?? 0;
   const onlinePct = totalDeviceCount > 0 ? (onlineDeviceCount / totalDeviceCount) * 100 : 0;
-  const criticalDeviceCount = issueDevices.filter((device) => device.health === "critical").length;
-  const warningDeviceCount = issueDevices.filter((device) => device.health === "warning").length;
   const activeAlarmCount = alarmsQuery.data?.totalElements ?? summary?.activeAlarmCount ?? 0;
-  const alarmCriticalCount = summary?.criticalAlarmCount ?? alarms.filter((a) => a.severity === "CRITICAL" || a.severity === "MAJOR").length;
-  const criticalSiteCount = siteRows.filter((site) => site.health === "critical").length;
-  const warningSiteCount = siteRows.filter((site) => site.health === "warning").length;
   const lastUpdated = latestTimestamp([overviewQuery.data?.generatedAt, overviewQuery.data?.range?.endAt]);
   const refreshing = overviewQuery.isFetching || sitesQuery.isFetching || alarmsQuery.isFetching;
   const siteMapItems: SiteMapItem[] = (sitesQuery.data?.items || [])
@@ -80,36 +75,12 @@ export function OverviewDashboard() {
 
       <FreshnessStrip updatedAt={freshestDeviceUpdate} currentCount={currentDeviceCount} totalCount={totalDeviceCount} />
 
-      <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
-        <MiniStat title="Sites" value={summary?.siteCount ?? siteRows.length} note={`${criticalSiteCount} critical / ${warningSiteCount} warning`} status={criticalSiteCount > 0 ? "critical" : warningSiteCount > 0 ? "warning" : "normal"} />
-        <MiniStat title="Devices" value={totalDeviceCount} note="Total monitored" />
-        <MiniStat title="Online" value={`${onlineDeviceCount}/${totalDeviceCount || 0}`} note={`${formatPercent(onlinePct)} reachable`} status={onlinePct < 90 ? "warning" : "normal"} />
-        <MiniStat title="Warning" value={warningDeviceCount} note="Devices with issues" status={warningDeviceCount > 0 ? "warning" : "normal"} />
-        <MiniStat title="Critical" value={criticalDeviceCount} note="Immediate action" status={criticalDeviceCount > 0 ? "critical" : "normal"} />
-        <MiniStat title="Alarms" value={activeAlarmCount} note={`${alarmCriticalCount} critical`} status={activeAlarmCount > 0 ? "warning" : "normal"} />
-      </div>
-
-      <div className="grid gap-3 xl:grid-cols-[0.85fr_1.05fr_1.1fr]">
-        <Panel title="Site Health" action={<Link href="/sites" className="border border-blue-800 bg-blue-700 px-2 py-1 text-[10px] font-semibold text-white hover:bg-blue-800">Sites</Link>}>
-          <div className="divide-y divide-slate-200">
-            {siteRows.slice(0, 4).map((site) => <SiteHealthRow key={site.siteKey} site={site} />)}
-            {siteRows.length === 0 ? <EmptyLine text="No site data" /> : null}
-          </div>
-        </Panel>
-
-        <Panel title="Critical / Warning Devices" action={<Link href="/devices" className="border border-blue-800 bg-blue-700 px-2 py-1 text-[10px] font-semibold text-white hover:bg-blue-800">Devices</Link>}>
-          <div className="divide-y divide-slate-200">
-            {issueDevices.map((device) => <IssueDeviceRow key={device.deviceId} device={device} />)}
-            {issueDevices.length === 0 ? <EmptyLine text="No issue devices" /> : null}
-          </div>
-        </Panel>
-
-        <Panel title="Active Alarms" action={<Link href="/alarms" className="border border-blue-800 bg-blue-700 px-2 py-1 text-[10px] font-semibold text-white hover:bg-blue-800">Alarms</Link>}>
-          <div className="divide-y divide-slate-200">
-            {alarms.map((alarm) => <AlarmRow key={alarm.alarmId} alarm={alarm} />)}
-            {alarms.length === 0 ? <EmptyLine text="No active alarms" /> : null}
-          </div>
-        </Panel>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-slate-300 bg-white px-3 py-2 text-xs text-slate-700">
+        <span><strong className="font-semibold text-slate-950">{totalDeviceCount}</strong> devices</span>
+        <span><strong className="font-semibold text-emerald-700">{onlineDeviceCount}</strong> online</span>
+        <span><strong className={`font-semibold ${summary?.staleDeviceCount ? "text-amber-700" : "text-slate-950"}`}>{summary?.staleDeviceCount ?? 0}</strong> stale</span>
+        <span><strong className={`font-semibold ${activeAlarmCount ? "text-red-700" : "text-slate-950"}`}>{activeAlarmCount}</strong> active alarms</span>
+        <span className="ml-auto text-slate-500">source: <strong className="font-medium text-slate-800">{overviewQuery.data?.source || "postgres"}</strong></span>
       </div>
 
       <div className="grid items-stretch gap-3 xl:min-h-[calc(100vh-430px)] xl:grid-cols-[minmax(0,2.2fr)_minmax(280px,0.8fr)]">
@@ -131,22 +102,16 @@ export function OverviewDashboard() {
           </div>
         </Panel>
       </div>
-    </DashboardShell>
-  );
-}
 
-function MiniStat({ title, value, note, status }: { title: string; value: string | number; note?: string; status?: string }) {
-  return (
-    <div className={`rounded-md border border-slate-300 bg-white px-3 py-2 shadow-sm ${status ? `border-l-4 ${statusBorderClass(status)}` : ""}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.03em] text-slate-600">{title}</p>
-          <p className="text-lg font-semibold leading-5 text-slate-950">{value}</p>
-          {note ? <p className="truncate text-[10px] text-slate-600">{note}</p> : null}
-        </div>
-        {status ? <StatusBadge status={status} /> : null}
-      </div>
-    </div>
+      <Panel title="Operational Events" action={<Link href="/alarms" className="text-[11px] font-medium text-blue-700 hover:underline">Open alarms</Link>}>
+        {alarms.length === 0 && issueDevices.length === 0 ? <p className="px-3 py-3 text-xs text-slate-500">No active incidents.</p> : (
+          <div className="divide-y divide-slate-200">
+            {alarms.slice(0, 5).map((alarm) => <AlarmRow key={alarm.alarmId} alarm={alarm} />)}
+            {issueDevices.slice(0, 5).map((device) => <IssueDeviceRow key={device.deviceId} device={device} />)}
+          </div>
+        )}
+      </Panel>
+    </DashboardShell>
   );
 }
 
@@ -159,18 +124,6 @@ function Panel({ title, action, children, className = "" }: { title: string; act
       </div>
       {children}
     </div>
-  );
-}
-
-function SiteHealthRow({ site }: { site: ReportSiteRow }) {
-  return (
-    <Link href={`/sites/${site.siteKey}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-2 hover:bg-slate-100">
-      <div className="min-w-0">
-        <p className="truncate text-xs font-semibold text-slate-950">{site.siteName}</p>
-        <p className="text-[10px] text-slate-600">{site.onlineDeviceCount}/{site.deviceCount} online · {site.activeAlarmCount} alarms</p>
-      </div>
-      <StatusBadge status={site.health} />
-    </Link>
   );
 }
 
@@ -246,24 +199,6 @@ function latestTimestamp(values: Array<string | undefined>) {
     }
   }
   return latest;
-}
-
-function statusBorderClass(status: string) {
-  switch (status) {
-    case "normal":
-    case "fresh":
-    case "online":
-    case "active":
-      return "border-l-emerald-500";
-    case "warning":
-    case "stale":
-      return "border-l-amber-500";
-    case "critical":
-    case "offline":
-      return "border-l-red-600";
-    default:
-      return "border-l-slate-400";
-  }
 }
 
 type SiteMapItem = {
