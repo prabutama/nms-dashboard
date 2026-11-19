@@ -10,6 +10,7 @@ import { FreshnessStrip, StatusBadge } from "@/components/nms-ui";
 import { fetchAlarms, fetchReportOverview, fetchSites } from "@/lib/api";
 import { formatDateTime, formatPercent, formatRelativeTime, freshnessState } from "@/lib/format";
 import type { Alarm, ReportDeviceRow } from "@/lib/types";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const SiteMapPanel = dynamic(() => import("@/components/site-map-panel").then((mod) => mod.SiteMapPanel), {
   ssr: false,
@@ -130,24 +131,16 @@ export function OverviewDashboard() {
 
       <Panel title="Device Health" action={<Link href="/devices" className="text-[11px] font-medium text-blue-700 hover:underline">All devices</Link>}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] border-collapse text-left text-xs">
-            <thead className="border-b border-slate-300 bg-slate-50 text-[10px] uppercase tracking-[0.04em] text-slate-500">
+          <Table className="min-w-[820px]">
+            <TableHeader className="bg-slate-50">
               <tr>
-                <th className="px-3 py-2 font-semibold">Device</th>
-                <th className="px-3 py-2 font-semibold">Type</th>
-                <th className="px-3 py-2 font-semibold">State</th>
-                <th className="px-3 py-2 font-semibold">Telemetry</th>
-                <th className="px-3 py-2 text-right font-semibold">Latency</th>
-                <th className="px-3 py-2 text-right font-semibold">Loss</th>
-                <th className="px-3 py-2 text-right font-semibold">CPU</th>
-                <th className="px-3 py-2 text-right font-semibold">Memory</th>
-                <th className="px-3 py-2 text-right font-semibold">Updated</th>
+                <TableHead>Device</TableHead><TableHead>Type</TableHead><TableHead>State</TableHead><TableHead>Telemetry</TableHead><TableHead className="text-right">Latency</TableHead><TableHead className="text-right">Loss</TableHead><TableHead className="text-right">CPU</TableHead><TableHead className="text-right">Memory</TableHead><TableHead className="text-right">Updated</TableHead>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
+            </TableHeader>
+            <TableBody>
               {deviceRows.map((device) => <DeviceHealthRow key={device.deviceId} device={device} />)}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       </Panel>
 
@@ -222,17 +215,10 @@ function DeviceHealthRow({ device }: { device: ReportDeviceRow }) {
   const state = !device.reachable ? "Offline" : device.health === "critical" ? "Critical" : device.health === "warning" ? "Warning" : "Online";
   const stateClass = state === "Offline" || state === "Critical" ? "text-red-700" : state === "Warning" ? "text-amber-700" : "text-emerald-700";
   return (
-    <tr className="transition hover:bg-slate-50">
-      <td className="px-3 py-2.5"><Link href={`/devices/${device.deviceId}?site=${device.siteKey}`} className="font-medium text-slate-950 hover:text-blue-700">{device.name}</Link><p className="font-mono text-[10px] text-slate-500">{device.deviceId}</p></td>
-      <td className="px-3 py-2.5 capitalize text-slate-600">{device.type.replaceAll("_", " ")}</td>
-      <td className={`px-3 py-2.5 font-medium ${stateClass}`}>{state}</td>
-      <td className="px-3 py-2.5 text-slate-600">{device.freshness === "fresh" ? "Current" : device.freshness === "stale" ? "Stale" : "Unknown"}</td>
-      <td className="px-3 py-2.5 text-right font-mono text-slate-700">{device.avgLatencyMs.toFixed(1)} ms</td>
-      <td className="px-3 py-2.5 text-right font-mono text-slate-700">{formatPercent(device.packetLossPct)}</td>
-      <td className="px-3 py-2.5 text-right font-mono text-slate-700">{formatPercent(device.cpuAvgPct)}</td>
-      <td className="px-3 py-2.5 text-right font-mono text-slate-700">{formatPercent(device.memoryAvgPct)}</td>
-      <td className="px-3 py-2.5 text-right text-[11px] text-slate-500">{formatRelativeTime(device.updatedAt)}</td>
-    </tr>
+    <TableRow>
+      <TableCell><Link href={`/devices/${device.deviceId}?site=${device.siteKey}`} className="font-medium text-slate-950 hover:text-blue-700">{device.name}</Link><p className="font-mono text-[10px] text-slate-500">{device.deviceId}</p></TableCell>
+      <TableCell className="capitalize text-slate-600">{device.type.replaceAll("_", " ")}</TableCell><TableCell className={`font-medium ${stateClass}`}>{state}</TableCell><TableCell className="text-slate-600">{device.freshness === "fresh" ? "Current" : device.freshness === "stale" ? "Stale" : "Unknown"}</TableCell><TableCell className="text-right font-mono text-slate-700">{device.avgLatencyMs.toFixed(1)} ms</TableCell><TableCell className="text-right font-mono text-slate-700">{formatPercent(device.packetLossPct)}</TableCell><TableCell className="text-right font-mono text-slate-700">{formatPercent(device.cpuAvgPct)}</TableCell><TableCell className="text-right font-mono text-slate-700">{formatPercent(device.memoryAvgPct)}</TableCell><TableCell className="text-right text-[11px] text-slate-500">{formatRelativeTime(device.updatedAt)}</TableCell>
+    </TableRow>
   );
 }
 

@@ -3,9 +3,11 @@ import type { ReactNode } from "react";
 
 import { formatDateTime, formatMetricValue, freshnessLabel, freshnessState } from "@/lib/format";
 import type { DashboardMetricCard } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
 
 export function StatusBadge({ status }: { status: string }) {
-  return <span className={`inline-flex rounded-sm border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.04em] ${badgeClass(status)}`}>{status}</span>;
+  const variant = status === "critical" || status === "offline" ? "critical" : status === "warning" || status === "stale" ? "warning" : status === "normal" || status === "online" || status === "fresh" || status === "active" ? "success" : "default";
+  return <Badge variant={variant}>{status}</Badge>;
 }
 
 export function Panel({ title, action, children, className = "" }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {

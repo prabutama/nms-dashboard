@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Activity, Bell, ChevronLeft, ChevronRight, Database, FileText, Home, Map, Menu, RefreshCw, Server, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/", label: "Overview", icon: Home },
@@ -49,22 +50,22 @@ export function DashboardShell({ title, subtitle, actions, children }: { title: 
                 <p className="text-[11px] text-slate-600">Operations Console</p>
               </div>
             ) : null}
-            <button
+            <Button variant="outline" size="icon"
               type="button"
               aria-label={mobileOpen ? "Close navigation" : "Collapse navigation"}
               className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-sm border border-slate-300 text-slate-700 hover:bg-slate-100 lg:hidden"
               onClick={() => setMobileOpen(false)}
             >
               <X className="h-4 w-4" />
-            </button>
-            <button
+            </Button>
+            <Button variant="outline" size="icon"
               type="button"
               aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
               className="ml-auto hidden h-9 w-9 items-center justify-center rounded-sm border border-slate-300 text-slate-700 hover:bg-slate-100 lg:inline-flex"
               onClick={() => setCollapsed((value) => !value)}
             >
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </button>
+            </Button>
           </div>
 
           <nav className="flex-1 space-y-1 px-3 py-4">
@@ -98,14 +99,14 @@ export function DashboardShell({ title, subtitle, actions, children }: { title: 
         <div className="border-b border-slate-300 bg-white px-4 py-3 shadow-sm sm:px-6">
           <div className="flex items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
-              <button
+               <Button variant="outline" size="icon"
                 type="button"
                 aria-label="Open navigation"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-slate-300 text-slate-700 hover:bg-slate-100 lg:hidden"
                 onClick={() => setMobileOpen(true)}
               >
                 <Menu className="h-4 w-4" />
-              </button>
+               </Button>
               <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.03em] text-blue-700">Monitoring</p>
                 <h1 className="text-lg font-semibold tracking-tight text-slate-950">{title}</h1>
@@ -117,7 +118,7 @@ export function DashboardShell({ title, subtitle, actions, children }: { title: 
                 <span>Live</span>
                 <span className="font-mono text-slate-800">{clock || "--:--:--"}</span>
               </div>
-              {actions ? <div>{actions}</div> : <button type="button" aria-label="Refresh data" onClick={() => window.location.reload()} className="inline-flex h-9 w-9 items-center justify-center rounded-sm border border-slate-300 text-slate-700 hover:bg-slate-100"><RefreshCw className="h-4 w-4" /></button>}
+              {actions ? <div>{actions}</div> : <Button variant="outline" size="icon" aria-label="Refresh data" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /></Button>}
             </div>
           </div>
           {subtitle ? <p className="mt-0.5 max-w-3xl text-sm text-slate-600">{subtitle}</p> : null}
