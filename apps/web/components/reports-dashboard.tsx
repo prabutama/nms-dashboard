@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback } from "react";
 
 import { DashboardShell } from "@/components/dashboard-shell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { StatCard, StatusBadge } from "@/components/nms-ui";
 import { fetchReportOverview } from "@/lib/api";
 import type { ReportDeviceRow, ReportSiteRow } from "@/lib/types";
@@ -178,9 +180,9 @@ export function ReportsDashboard() {
             <span className="text-xs font-semibold text-slate-700">Period:</span>
             <div className="flex flex-wrap gap-1">
               {RANGES.map((r) => (
-                  <button key={r.value} onClick={() => setRange(r.value)} className={`rounded-sm border px-3 py-1.5 text-xs font-medium transition ${range === r.value ? "border-blue-800 bg-blue-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"}`}>
+                  <Button key={r.value} variant={range === r.value ? "default" : "outline"} onClick={() => setRange(r.value)}>
                   {r.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -194,35 +196,35 @@ export function ReportsDashboard() {
 
         <SummaryStrip data={overviewQuery.data} />
 
-        <div className="rounded-md border border-slate-300 bg-white shadow-sm">
-          <div className="flex items-center justify-between rounded-t-md border-b border-slate-300 bg-slate-100 px-4 py-3">
+        <Card className="border-slate-300 bg-white shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-slate-300 bg-slate-50 px-4 py-3 space-y-0">
             <div>
-              <p className="text-xs font-semibold text-slate-800">Sites Report</p>
+              <CardTitle className="text-xs font-semibold text-slate-800">Sites Report</CardTitle>
               <p className="mt-0.5 text-[11px] text-slate-600">Per-site device counts, alarm counts, and health.</p>
             </div>
             {siteRows.length > 0 ? (
-              <button onClick={handleExportSitesCSV} className="border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-50">
+              <Button variant="outline" onClick={handleExportSitesCSV}>
                 Export CSV
-              </button>
+              </Button>
             ) : null}
-          </div>
-          <div className="overflow-x-auto"><SitesTable rows={siteRows} /></div>
-        </div>
+          </CardHeader>
+          <CardContent className="p-0"><SitesTable rows={siteRows} /></CardContent>
+        </Card>
 
-        <div className="rounded-md border border-slate-300 bg-white shadow-sm">
-          <div className="flex items-center justify-between rounded-t-md border-b border-slate-300 bg-slate-100 px-4 py-3">
+        <Card className="border-slate-300 bg-white shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between border-b border-slate-300 bg-slate-50 px-4 py-3 space-y-0">
             <div>
-              <p className="text-xs font-semibold text-slate-800">Devices Report</p>
+              <CardTitle className="text-xs font-semibold text-slate-800">Devices Report</CardTitle>
               <p className="mt-0.5 text-[11px] text-slate-600">Per-device health, alarm count, and key metrics.</p>
             </div>
             {deviceRows.length > 0 ? (
-              <button onClick={handleExportDevicesCSV} className="border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-800 hover:bg-blue-50">
+              <Button variant="outline" onClick={handleExportDevicesCSV}>
                 Export CSV
-              </button>
+              </Button>
             ) : null}
-          </div>
-          <div className="overflow-x-auto"><DevicesTable rows={deviceRows} showSiteKey /></div>
-        </div>
+          </CardHeader>
+          <CardContent className="p-0"><DevicesTable rows={deviceRows} showSiteKey /></CardContent>
+        </Card>
       </div>
     </DashboardShell>
   );

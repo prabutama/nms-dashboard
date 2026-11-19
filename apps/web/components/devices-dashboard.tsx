@@ -7,6 +7,7 @@ import { DashboardShell } from "@/components/dashboard-shell";
 import { DeviceLink, FreshnessStrip, StatCard } from "@/components/nms-ui";
 import { fetchReportDevices, fetchReportSummary } from "@/lib/api";
 import { freshnessState } from "@/lib/format";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function DevicesDashboard() {
   const [search, setSearch] = useState("");
@@ -43,8 +44,8 @@ export function DevicesDashboard() {
       </section>
       <FreshnessStrip updatedAt={latestUpdate} currentCount={currentCount} totalCount={devices.length} />
 
-       <section className="rounded-md border border-slate-300 bg-white shadow-sm">
-        <div className="border-b border-slate-300 bg-slate-100 px-4 py-3">
+       <Card className="border-slate-300 bg-white shadow-sm">
+         <CardHeader className="border-b border-slate-300 bg-slate-50 px-4 py-3 space-y-0">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div><p className="text-xs font-semibold text-slate-800">Device Inventory</p><p className="mt-0.5 text-[11px] text-slate-600">{filteredDevices.length} of {devices.length} devices</p></div>
             <div className="flex flex-wrap gap-2">
@@ -53,15 +54,17 @@ export function DevicesDashboard() {
                <select value={health} onChange={(event) => setHealth(event.target.value)} className="rounded-sm border border-slate-300 bg-white px-2 py-1.5 text-xs"><option value="all">All health</option><option value="normal">Normal</option><option value="warning">Warning</option><option value="critical">Critical</option><option value="unknown">Unknown</option></select>
             </div>
           </div>
-        </div>
-        {devicesQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-600">Loading devices...</p> : null}
-        <div className="divide-y divide-slate-200">
+         </CardHeader>
+         <CardContent className="p-0">
+         {devicesQuery.isLoading ? <p className="px-4 py-5 text-xs text-slate-600">Loading devices...</p> : null}
+         <div className="divide-y divide-slate-200">
           {filteredDevices.map((device) => (
             <DeviceLink key={device.deviceId} href={`/devices/${device.deviceId}${device.siteKey ? `?site=${device.siteKey}` : ""}`} name={device.name} type={`${device.type}${device.siteKey ? ` · ${device.siteKey}` : ""}`} status={device.health} />
           ))}
           {!devicesQuery.isLoading && filteredDevices.length === 0 ? <p className="px-4 py-8 text-center text-xs text-slate-600">No devices match current filters.</p> : null}
-        </div>
-      </section>
+         </div>
+         </CardContent>
+       </Card>
     </DashboardShell>
   );
 }

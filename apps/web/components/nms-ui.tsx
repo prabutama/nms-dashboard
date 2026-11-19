@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { formatDateTime, formatMetricValue, freshnessLabel, freshnessState } from "@/lib/format";
 import type { DashboardMetricCard } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function StatusBadge({ status }: { status: string }) {
   const variant = status === "critical" || status === "offline" ? "critical" : status === "warning" || status === "stale" ? "warning" : status === "normal" || status === "online" || status === "fresh" || status === "active" ? "success" : "default";
@@ -12,13 +13,13 @@ export function StatusBadge({ status }: { status: string }) {
 
 export function Panel({ title, action, children, className = "" }: { title: string; action?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`min-h-0 rounded-md border border-slate-300 bg-white shadow-sm ${className}`}>
-      <div className="flex min-h-11 items-center justify-between gap-3 rounded-t-md border-b border-slate-300 bg-slate-50 px-3 py-2.5">
-        <p className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-800">{title}</p>
+    <Card className={`min-h-0 border-slate-300 bg-white shadow-sm ${className}`}>
+      <CardHeader className="flex min-h-11 flex-row items-center justify-between gap-3 border-b border-slate-300 bg-slate-50 px-3 py-2.5 space-y-0">
+        <CardTitle className="text-xs font-semibold uppercase tracking-[0.04em] text-slate-800">{title}</CardTitle>
         {action}
-      </div>
-      {children}
-    </section>
+      </CardHeader>
+      <CardContent className="p-0">{children}</CardContent>
+    </Card>
   );
 }
 
@@ -55,7 +56,8 @@ export function FreshnessStrip({ updatedAt, currentCount, totalCount, refreshSec
 
 export function MetricCard({ metric }: { metric: DashboardMetricCard }) {
   return (
-    <div className="rounded-md border border-slate-300 bg-white px-4 py-3 shadow-sm">
+    <Card className="border-slate-300 bg-white shadow-sm">
+      <CardContent className="px-4 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-semibold text-slate-800">{metric.label}</p>
@@ -63,20 +65,23 @@ export function MetricCard({ metric }: { metric: DashboardMetricCard }) {
         </div>
         <StatusBadge status={metric.status} />
       </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
 export function StatCard({ title, value, note, status }: { title: string; value: string | number; note?: string; status?: string }) {
   return (
-    <div className={`flex items-center justify-between rounded-md border border-slate-300 bg-white px-4 py-3 shadow-sm ${status ? `border-l-4 ${statusBorderClass(status)}` : ""}`}>
+    <Card className={`flex items-center justify-between border-slate-300 bg-white shadow-sm ${status ? `border-l-4 ${statusBorderClass(status)}` : ""}`}>
+      <CardContent className="flex w-full items-center justify-between px-4 py-3">
       <div className="min-w-0">
         <p className="text-xs font-semibold uppercase tracking-[0.02em] text-slate-600">{title}</p>
         <p className="mt-0.5 text-base font-semibold text-slate-950">{value}</p>
         {note ? <p className="mt-0.5 truncate text-[11px] text-slate-600">{note}</p> : null}
       </div>
       {status ? <StatusBadge status={status} /> : null}
-    </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -90,24 +95,6 @@ export function DeviceLink({ href, name, type, status }: { href: string; name: s
       <StatusBadge status={status || "unknown"} />
     </Link>
   );
-}
-
-function badgeClass(status: string) {
-  switch (status) {
-    case "normal":
-    case "fresh":
-    case "online":
-    case "active":
-      return "border-emerald-200 bg-emerald-100 text-emerald-800";
-    case "warning":
-    case "stale":
-      return "border-amber-200 bg-amber-100 text-amber-800";
-    case "critical":
-    case "offline":
-      return "border-red-200 bg-red-100 text-red-800";
-    default:
-      return "border-slate-300 bg-slate-200 text-slate-700";
-  }
 }
 
 function statusBorderClass(status: string) {
